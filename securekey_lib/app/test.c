@@ -3,6 +3,7 @@
 #include "rsa_data.h"
 
 #define MAX_RSA_ATTRIBUTES	13
+#define MAX_FIND_OBJ_SIZE	50
 
 static void populate_attrs(SK_ATTRIBUTE *attrs)
 {
@@ -62,8 +63,28 @@ static void do_CreateObject(void)
 		printf("SK_CreateObject successful handle = 0x%x\n", hObject);
 }
 
+static void do_EnumerateObject(void)
+{
+	int ret, i = 0;
+	SK_ATTRIBUTE attrs = {0};
+	SK_OBJECT_HANDLE hObject[MAX_FIND_OBJ_SIZE];
+	uint32_t objCount;
+
+	ret = SK_EnumerateObjects(&attrs, 0, hObject, MAX_FIND_OBJ_SIZE,
+		&objCount);
+
+	if (ret != SKR_OK)
+		printf("SK_EnumerateObjects failed\n");
+	else {
+		printf("SK_EnumerateObjects successful\n");
+		for (i = 0; i < objCount; i++)
+			printf("hObject[%d] = 0x%x\n", i, hObject[i]);
+	}
+}
+
 int main(int argc, char *argv[])
 {
 	do_CreateObject();
+	do_EnumerateObject();
 	return 0;
 }
