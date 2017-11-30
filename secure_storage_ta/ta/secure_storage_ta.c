@@ -3,7 +3,9 @@
 #include <tee_internal_api.h>
 #include <tee_internal_api_extensions.h>
 
+#include "string.h"
 #include "ta_secure_storage.h"
+#include "secure_storage_common.h"
 
 /*
  * Called when the instance of the TA is created. This is the first call in
@@ -34,6 +36,8 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t param_types,
 						   TEE_PARAM_TYPE_NONE,
 						   TEE_PARAM_TYPE_NONE,
 						   TEE_PARAM_TYPE_NONE);
+	uint32_t ret = TEE_SUCCESS;
+
 	if (param_types != exp_param_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
@@ -41,13 +45,9 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t param_types,
 	(void)&params;
 	(void)&sess_ctx;
 
-	/*
-	 * The DMSG() macro is non-standard, TEE Internal API doesn't
-	 * specify any means to logging from a TA.
-	 */
-	DMSG("Hello!!\n");
-	/* If return value != TEE_SUCCESS the session will not be created. */
-	return TEE_SUCCESS;
+	ret = TA_OpenCreateDatabase();
+
+	return ret;
 }
 
 /*
@@ -60,9 +60,11 @@ void TA_CloseSessionEntryPoint(void *sess_ctx)
 	DMSG("Goodbye!\n");
 }
 
-static TEE_Result inc_value(uint32_t param_types, TEE_Param params[4])
+static TEE_Result TA_GetObjectAttributes(uint32_t param_types,
+					 TEE_Param params[4])
 {
-	uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INOUT,
+	/* TODO */
+	uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_NONE,
 						   TEE_PARAM_TYPE_NONE,
 						   TEE_PARAM_TYPE_NONE,
 						   TEE_PARAM_TYPE_NONE);
@@ -70,7 +72,8 @@ static TEE_Result inc_value(uint32_t param_types, TEE_Param params[4])
 	if (param_types != exp_param_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
-	params[0].value.a++;
+	(void)params; /* Unused parameter */
+
 	return TEE_SUCCESS;
 }
 
@@ -85,8 +88,12 @@ TEE_Result TA_InvokeCommandEntryPoint(void *sess_ctx, uint32_t cmd_id,
 	(void)&sess_ctx; /* Unused parameter */
 
 	switch (cmd_id) {
-	case TA_SECURE_STORAGE_CMD_INC_VALUE:
-		return inc_value(param_types, params);
+	case TEE_CREATE_OBJECT:
+		return TA_CreateObject(param_types, params);
+	case TEE_FIND_OBJECTS:
+		return TA_FindObjects(param_types, params);
+	case TEE_GET_OBJ_ATTRIBUTES:
+		return TA_GetObjectAttributes(param_types, params);
 	default:
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
