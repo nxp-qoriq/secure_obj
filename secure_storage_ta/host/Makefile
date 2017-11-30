@@ -9,8 +9,9 @@ READELF = $(CROSS_COMPILE)readelf
 
 OBJS = secure_storage.o
 
-CFLAGS += -Wall -I../ta/include -I$(TEEC_EXPORT)/include
-LDADD += -lteec -L$(TEEC_EXPORT)/lib
+CFLAGS += -Wall -I. -I../ta/include -I$(OPTEE_CLIENT_EXPORT)/include
+CFLAGS += -I$(TA_DEV_KIT_DIR)/host_include
+LDADD += -lteec -L$(OPTEE_CLIENT_EXPORT)/lib
 
 .PHONY: all
 all: secure_storage
