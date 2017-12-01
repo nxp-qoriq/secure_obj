@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <securekey_api.h>
 #include "rsa_data.h"
 
@@ -51,16 +52,24 @@ static void populate_attrs(SK_ATTRIBUTE *attrs)
 static void do_CreateObject(void)
 {
 	int ret;
-	SK_ATTRIBUTE attrs[MAX_RSA_ATTRIBUTES] = {0};
+	SK_ATTRIBUTE *attrs;
 	SK_OBJECT_HANDLE hObject;
+
+	attrs = (SK_ATTRIBUTE *)malloc(sizeof(SK_ATTRIBUTE) * MAX_RSA_ATTRIBUTES);
+	if (attrs == NULL) {
+		printf("malloc failed\n");
+		return;
+	}
 
 	populate_attrs(attrs);
 
 	ret = SK_CreateObject(attrs, MAX_RSA_ATTRIBUTES, &hObject);
 	if (ret != SKR_OK)
-		printf("SK_CreateObject failed\n");
+		printf("SK_CreateObject failed wit err code = 0x%x\n", ret);
 	else
 		printf("SK_CreateObject successful handle = 0x%x\n", hObject);
+
+	free(attrs);
 }
 
 static void do_EnumerateObject(void)
@@ -74,7 +83,7 @@ static void do_EnumerateObject(void)
 		&objCount);
 
 	if (ret != SKR_OK)
-		printf("SK_EnumerateObjects failed\n");
+		printf("SK_EnumerateObjects failed with code = 0x%x\n", ret);
 	else {
 		printf("SK_EnumerateObjects successful\n");
 		for (i = 0; i < objCount; i++)
