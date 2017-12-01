@@ -208,7 +208,7 @@ int main(int argc, char *argv[])
 
 	populate_attrs(attrs);
 
-	shm_in.size = get_attr_size(attrs, 0);
+	shm_in.size = get_attr_size(attrs, 5);
 	shm_in.flags = TEEC_MEM_INPUT;
 
 	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
@@ -217,7 +217,7 @@ int main(int argc, char *argv[])
 		goto fail2;
 	}
 
-	res = pack_attrs(shm_in.buffer, shm_in.size, attrs, 0);
+	res = pack_attrs(shm_in.buffer, shm_in.size, attrs, 5);
 	if (res != TEEC_SUCCESS) {
 		printf("pack_attrs failed with code 0x%x", res);
 		goto fail3;

@@ -166,3 +166,18 @@ SK_ATTRIBUTE *TA_GetSKAttr(SK_ATTRIBUTE_TYPE type, SK_ATTRIBUTE *attrs,
 
 	return match_attr;
 }
+
+/* Returns 1 if attributes match else 0 */
+uint32_t TA_CompareSKAttr(SK_ATTRIBUTE *a1, SK_ATTRIBUTE *a2)
+{
+	if (a1->type != a2->type)
+		return 0;
+
+	if (a1->valueLen != a2->valueLen)
+		return 0;
+
+	if (memcmp(a1->value, a2->value, a1->valueLen))
+		return 0;
+
+	return 1;
+}

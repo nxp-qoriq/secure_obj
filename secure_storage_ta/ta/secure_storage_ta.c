@@ -45,7 +45,7 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t param_types,
 	(void)&params;
 	(void)&sess_ctx;
 
-	ret = TA_OpenCreateDatabase();
+	ret = TA_OpenDatabase();
 
 	return ret;
 }

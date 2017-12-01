@@ -5,7 +5,7 @@
 
 const char db_obj_id[] = "obj_db";
 
-TEE_Result TA_OpenCreateDatabase(void)
+TEE_Result TA_OpenDatabase(void)
 {
 	TEE_ObjectHandle hObject = TEE_HANDLE_NULL;
 	uint32_t ret = TEE_SUCCESS;
