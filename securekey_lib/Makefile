@@ -43,7 +43,7 @@ securekey_lib: $(SECUREKEY_LIBRARY)
 
 $(SECUREKEY_LIBRARY): $(SECUREKEY_OBJS)
 	@echo "  LD      $@"
-	$(VPREFIX)$(CC) -shared -Wl,-soname,$(LIB_NAME) $(SECUREKEY_LFLAGS) -o $@ $+
+	$(VPREFIX)$(CC) -shared -Wl,-soname,$(LIB_NAME) -o $@ $+ $(SECUREKEY_LFLAGS)
 
 securekey_static_lib: $(SECUREKEY_STATIC_LIBRARY)
 

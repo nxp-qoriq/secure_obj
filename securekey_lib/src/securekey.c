@@ -5,6 +5,7 @@
 #include <tee_client_api.h>
 #include <ta_secure_storage.h>
 #include <securekey_api_types.h>
+#include <securekey_api.h>
 
 struct tee_attr_packed {
 	uint32_t attr_id;
@@ -154,6 +155,15 @@ static size_t get_attr_size(SK_ATTRIBUTE *attrs, uint32_t attr_cnt)
 
 	return size;
 }
+
+SK_FUNCTION_LIST global_function_list = {
+	.SK_EnumerateObjects	=	SK_EnumerateObjects,
+#if 0
+	.SK_GetObjectAttribute	=	SK_GetObjectAttribute,
+	.SK_GetSupportedMechanisms =	SK_GetSupportedMechanisms,
+	.SK_Sign			=	SK_Sign,
+#endif
+};
 
 SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
 		uint16_t attrCount, SK_OBJECT_HANDLE *phObject)
@@ -326,4 +336,14 @@ fail1:
 	TEEC_FinalizeContext(&ctx);
 end:
 	return ret;
+}
+
+SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
+{
+	if (ppFuncList == NULL)
+		return SKR_ERR_BAD_PARAMETERS;
+
+	*ppFuncList = &global_function_list;
+
+	return SKR_OK;
 }
