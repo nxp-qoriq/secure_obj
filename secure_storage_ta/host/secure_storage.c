@@ -11,7 +11,9 @@
 #define MAX_RSA_ATTRIBUTES	13
 #define MAX_FIND_OBJ_SIZE	50
 
+#define CREATE_OBJ
 #define FIND_OBJ
+#define ERASE_OBJ
 
 /* Round up the even multiple of size, size has to be a multiple of 2 */
 #define ROUNDUP(v, size) (((v) + (size - 1)) & ~(size - 1))
@@ -131,10 +133,17 @@ int main(int argc, char *argv[])
 	TEEC_Session sess;
 	TEEC_Operation op;
 	TEEC_UUID uuid = TA_SECURE_STORAGE_UUID;
-	TEEC_SharedMemory shm_in, shm_out;
+	TEEC_SharedMemory shm_in;
 	SK_ATTRIBUTE attrs[MAX_RSA_ATTRIBUTES] = {0};
 	uint32_t err_origin;
+#ifdef FIND_OBJ
+	TEEC_SharedMemory shm_out;
 	uint32_t no_of_objects = 0;
+#endif
+
+#if defined(CREATE_OBJ) || defined(ERASE_OBJ)
+	uint32_t obj_idx = 0;
+#endif
 
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
@@ -194,7 +203,34 @@ int main(int argc, char *argv[])
 		printf("TEEC_InvokeCommand failed with code 0x%x", res);
 		goto fail3;
 	}
+
+	obj_idx = op.params[1].value.a;
+
 	printf("TEE_CREATE_OBJECT successful\n");
+#endif
+
+#ifdef ERASE_OBJ
+	/*
+	 * Execute a function in the TA by invoking it, in this case
+	 * we're erasing a SK key pair object.
+	 *
+	 * The value of command ID part and how the parameters are
+	 * interpreted is part of the interface provided by the TA.
+	 */
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_NONE,
+					 TEEC_NONE, TEEC_NONE);
+	op.params[0].value.a = obj_idx;
+
+	printf("Invoking TEE_ERASE_OBJECT\n");
+	res = TEEC_InvokeCommand(&sess, TEE_ERASE_OBJECT, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		goto fail2;
+	}
+	printf("TEE_ERASE_OBJECT successful\n");
 #endif
 
 #ifdef FIND_OBJ

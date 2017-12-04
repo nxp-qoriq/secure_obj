@@ -10,8 +10,14 @@ TEE_Result TA_GetNextObjectID(uint32_t *next_obj_id);
 /* Create Object API */
 TEE_Result TA_CreateObject(uint32_t param_types, TEE_Param params[4]);
 
+/* Erase Object API */
+TEE_Result TA_EraseObject(uint32_t param_types, TEE_Param params[4]);
+
 /* Find Object API */
 TEE_Result TA_FindObjects(uint32_t param_types, TEE_Param params[4]);
+
+/* Get Attribute Object API */
+TEE_Result TA_GetObjectAttributes(uint32_t param_types, TEE_Param params[4]);
 
 /* Helper API's declaration */
 TEE_Result pack_sk_attrs(const SK_ATTRIBUTE *attrs, uint32_t attr_count,

@@ -60,23 +60,6 @@ void TA_CloseSessionEntryPoint(void *sess_ctx)
 	DMSG("Goodbye!\n");
 }
 
-static TEE_Result TA_GetObjectAttributes(uint32_t param_types,
-					 TEE_Param params[4])
-{
-	/* TODO */
-	uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_NONE,
-						   TEE_PARAM_TYPE_NONE,
-						   TEE_PARAM_TYPE_NONE,
-						   TEE_PARAM_TYPE_NONE);
-
-	if (param_types != exp_param_types)
-		return TEE_ERROR_BAD_PARAMETERS;
-
-	(void)params; /* Unused parameter */
-
-	return TEE_SUCCESS;
-}
-
 /*
  * Called when a TA is invoked. sess_ctx hold that value that was
  * assigned by TA_OpenSessionEntryPoint(). The rest of the paramters
@@ -94,6 +77,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void *sess_ctx, uint32_t cmd_id,
 		return TA_FindObjects(param_types, params);
 	case TEE_GET_OBJ_ATTRIBUTES:
 		return TA_GetObjectAttributes(param_types, params);
+	case TEE_ERASE_OBJECT:
+		return TA_EraseObject(param_types, params);
 	default:
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
