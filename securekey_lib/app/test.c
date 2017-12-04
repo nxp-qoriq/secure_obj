@@ -49,7 +49,7 @@ static void populate_attrs(SK_ATTRIBUTE *attrs)
 	attrs[12].valueLen = sizeof(rsa_coeff);
 }
 
-static void do_CreateObject(void)
+static SK_OBJECT_HANDLE do_CreateObject(void)
 {
 	int ret;
 	SK_ATTRIBUTE *attrs;
@@ -58,7 +58,7 @@ static void do_CreateObject(void)
 	attrs = (SK_ATTRIBUTE *)malloc(sizeof(SK_ATTRIBUTE) * MAX_RSA_ATTRIBUTES);
 	if (attrs == NULL) {
 		printf("malloc failed\n");
-		return;
+		return SKR_ERR_OBJECT_HANDLE_INVALID;
 	}
 
 	populate_attrs(attrs);
@@ -70,8 +70,20 @@ static void do_CreateObject(void)
 		printf("SK_CreateObject successful handle = 0x%x\n", hObject);
 
 	free(attrs);
+	return hObject;
 }
 
+static void do_EraseObject(SK_OBJECT_HANDLE hObject)
+{
+	int ret, i = 0;
+
+	ret = SK_EraseObject(hObject);
+
+	if (ret != SKR_OK)
+		printf("SK_EraseObject failed with code = 0x%x\n", ret);
+	else
+		printf("SK_EraseObject successful\n");
+}
 static void do_EnumerateObject(void)
 {
 	int ret, i = 0;
@@ -93,7 +105,14 @@ static void do_EnumerateObject(void)
 
 int main(int argc, char *argv[])
 {
-	do_CreateObject();
+	SK_OBJECT_HANDLE obj1;
+
+	obj1 = do_CreateObject();
+	if (obj1 == SKR_ERR_OBJECT_HANDLE_INVALID)
+		return -1;
+
+	do_EnumerateObject();
+	do_EraseObject(obj1);
 	do_EnumerateObject();
 	return 0;
 }

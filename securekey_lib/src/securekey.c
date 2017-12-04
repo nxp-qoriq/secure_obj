@@ -242,6 +242,54 @@ end:
 	return ret;
 }
 
+SK_RET_CODE SK_EraseObject(SK_OBJECT_HANDLE hObject)
+{
+	TEEC_Result res;
+	TEEC_Context ctx;
+	TEEC_Session sess;
+	TEEC_Operation op;
+	TEEC_UUID uuid = TA_SECURE_STORAGE_UUID;
+	uint32_t err_origin;
+	SK_RET_CODE ret = SKR_OK;
+
+	/* Initialize a context connecting us to the TEE */
+	res = TEEC_InitializeContext(NULL, &ctx);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto end;
+	}
+
+	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail1;
+	}
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_NONE,
+					 TEEC_NONE, TEEC_NONE);
+	op.params[0].value.a = hObject;
+
+	printf("Invoking TEE_ERASE_OBJECT\n");
+	res = TEEC_InvokeCommand(&sess, TEE_ERASE_OBJECT, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail2;
+	}
+	printf("TEE_ERASE_OBJECT successful\n");
+
+fail2:
+	TEEC_CloseSession(&sess);
+fail1:
+	TEEC_FinalizeContext(&ctx);
+end:
+	return ret;
+}
 
 SK_RET_CODE SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
 		uint32_t attrCount, SK_OBJECT_HANDLE *phObject,

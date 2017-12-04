@@ -40,6 +40,7 @@ typedef uint16_t SK_RET_CODE;
 #define SKR_ERR_BUSY			(0x6017) /* The system is busy working on something else.*/
 #define SKR_ERR_COMMUNICATION 		(0x6018) /* Communication with a remote party failed.*/
 #define SKR_ERR_SECURITY		(0x6019) /* A security fault was detected.*/
+#define SKR_ERR_OBJECT_HANDLE_INVALID	(0x6020) /* Object Handle Invalid */
 
 /*
  * A type for all the defines.
