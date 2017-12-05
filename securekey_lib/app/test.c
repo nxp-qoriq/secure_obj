@@ -87,13 +87,24 @@ static void do_EraseObject(SK_OBJECT_HANDLE hObject)
 static void do_EnumerateObject(void)
 {
 	int ret, i = 0;
-	SK_ATTRIBUTE attrs = {0};
+	SK_ATTRIBUTE attrs[2];
 	SK_OBJECT_HANDLE hObject[MAX_FIND_OBJ_SIZE];
 	uint32_t objCount;
 
-	ret = SK_EnumerateObjects(&attrs, 0, hObject, MAX_FIND_OBJ_SIZE,
-		&objCount);
+	/* Getting only RSA Keypair objects */
+	printf("Getting only RSA Keypair objects\n");
+	SK_OBJECT_TYPE key = SK_KEY_PAIR;
+	attrs[0].type = SK_ATTR_OBJECT_TYPE;
+	attrs[0].value = &key;
+	attrs[0].valueLen = sizeof(SK_OBJECT_TYPE);
 
+	SK_KEY_TYPE key_type = SKK_RSA;
+	attrs[1].type = SK_ATTR_KEY_TYPE;
+	attrs[1].value = &key_type;
+	attrs[1].valueLen = sizeof(SK_KEY_TYPE);
+
+	ret = SK_EnumerateObjects(attrs, 2, hObject, MAX_FIND_OBJ_SIZE,
+		&objCount);
 	if (ret != SKR_OK)
 		printf("SK_EnumerateObjects failed with code = 0x%x\n", ret);
 	else {
