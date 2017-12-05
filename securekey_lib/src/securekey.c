@@ -63,12 +63,13 @@ static uint32_t pack_attrs(uint8_t *buffer, size_t size,
 static SK_RET_CODE map_teec_err_to_sk(TEEC_Result tee_ret,
 	uint32_t err_origin)
 {
+	SK_RET_CODE ret;
 	switch(err_origin) {
 		case TEEC_ORIGIN_API:
-			return SKR_ERR_TEE_API;
+			ret =  SKR_ERR_TEE_API;
 			break;
 		case TEEC_ORIGIN_COMMS:
-			return SKR_ERR_TEE_COMM;
+			ret =  SKR_ERR_TEE_COMM;
 			break;
 		case TEEC_ORIGIN_TEE:
 		case TEEC_ORIGIN_TRUSTED_APP:
@@ -76,64 +77,66 @@ static SK_RET_CODE map_teec_err_to_sk(TEEC_Result tee_ret,
 		{
 			switch (tee_ret) {
 				case TEEC_ERROR_GENERIC:
-					return SKR_ERR_GENERAL_ERROR;
+					ret =  SKR_ERR_GENERAL_ERROR;
 					break;
 				case TEEC_ERROR_ACCESS_DENIED:
-					return SKR_ERR_ACCESS_DENIED;
+					ret =  SKR_ERR_ACCESS_DENIED;
 					break;
 				case TEEC_ERROR_CANCEL:
-					return SKR_ERR_CANCEL;
+					ret =  SKR_ERR_CANCEL;
 					break;
 				case TEEC_ERROR_ACCESS_CONFLICT:
-					return SKR_ERR_ACCESS_CONFLICT;
+					ret =  SKR_ERR_ACCESS_CONFLICT;
 					break;
 				case TEEC_ERROR_EXCESS_DATA:
-					return SKR_ERR_EXCESS_DATA;
+					ret =  SKR_ERR_EXCESS_DATA;
 					break;
 				case TEEC_ERROR_BAD_FORMAT:
-					return SKR_ERR_BAD_FORMAT;
+					ret =  SKR_ERR_BAD_FORMAT;
 					break;
 				case TEEC_ERROR_BAD_PARAMETERS:
-					return SKR_ERR_BAD_PARAMETERS;
+					ret =  SKR_ERR_BAD_PARAMETERS;
 					break;
 				case TEEC_ERROR_BAD_STATE:
-					return SKR_ERR_BAD_STATE;
+					ret =  SKR_ERR_BAD_STATE;
 					break;
 				case TEEC_ERROR_ITEM_NOT_FOUND:
-					return SKR_ERR_ITEM_NOT_FOUND;
+					ret =  SKR_ERR_ITEM_NOT_FOUND;
 					break;
 				case TEEC_ERROR_NOT_IMPLEMENTED:
-					return SKR_ERR_NOT_IMPLEMENTED;
+					ret =  SKR_ERR_NOT_IMPLEMENTED;
 					break;
 				case TEEC_ERROR_NOT_SUPPORTED:
-					return SKR_ERR_NOT_SUPPORTED;
+					ret =  SKR_ERR_NOT_SUPPORTED;
 					break;
 				case TEEC_ERROR_NO_DATA:
-					return SKR_ERR_NO_DATA;
+					ret =  SKR_ERR_NO_DATA;
 					break;
 				case TEEC_ERROR_OUT_OF_MEMORY:
-					return SKR_ERR_OUT_OF_MEMORY;
+					ret =  SKR_ERR_OUT_OF_MEMORY;
 					break;
 				case TEEC_ERROR_BUSY:
-					return SKR_ERR_BUSY;
+					ret =  SKR_ERR_BUSY;
 					break;
 				case TEEC_ERROR_COMMUNICATION:
-					return SKR_ERR_COMMUNICATION;
+					ret =  SKR_ERR_COMMUNICATION;
 					break;
 				case TEEC_ERROR_SECURITY:
-					return SKR_ERR_SECURITY;
+					ret =  SKR_ERR_SECURITY;
 					break;
 				case TEEC_ERROR_SHORT_BUFFER:
-					return SKR_ERR_SHORT_BUFFER;
+					ret =  SKR_ERR_SHORT_BUFFER;
 					break;
 				case TEEC_ERROR_TARGET_DEAD:
-					return SKR_ERR_BAD_PARAMETERS;
+					ret =  SKR_ERR_BAD_PARAMETERS;
 					break;
 				default:
-					return SKR_ERR_GENERAL_ERROR;
+					ret =  SKR_ERR_GENERAL_ERROR;
 			}
 		}
 	}
+
+	return ret;
 }
 
 static size_t get_attr_size(SK_ATTRIBUTE *attrs, uint32_t attr_cnt)
