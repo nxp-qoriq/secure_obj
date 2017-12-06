@@ -13,7 +13,8 @@
 
 #define CREATE_OBJ
 #define FIND_OBJ
-#define ERASE_OBJ
+//#define ERASE_OBJ
+#define ATTRIBUTE_OBJ
 
 /* Round up the even multiple of size, size has to be a multiple of 2 */
 #define ROUNDUP(v, size) (((v) + (size - 1)) & ~(size - 1))
@@ -126,6 +127,57 @@ uint32_t pack_attrs(uint8_t *buffer, size_t size,
 	return TEEC_SUCCESS;
 }
 
+uint32_t unpack_sk_attrs(const uint8_t *buf, size_t blen,
+			 SK_ATTRIBUTE *attrs, uint32_t *attr_count)
+{
+	uint32_t res = TEEC_SUCCESS;
+	SK_ATTRIBUTE *a = NULL;
+	const struct tee_attr_packed *ap;
+	size_t num_attrs = 0;
+	const size_t num_attrs_size = sizeof(uint32_t);
+
+	if (blen == 0)
+		goto out;
+
+	if (((uintptr_t)buf & 0x3) != 0 || blen < num_attrs_size)
+		return TEEC_ERROR_GENERIC;
+	num_attrs = *(uint32_t *) (void *)buf;
+
+	if ((blen - num_attrs_size) < (num_attrs * sizeof(*ap)))
+		return TEEC_ERROR_GENERIC;
+
+	ap = (const struct tee_attr_packed *)(buf + num_attrs_size);
+
+	if (num_attrs > 0) {
+		size_t n;
+
+		a = attrs;
+
+		for (n = 0; n < num_attrs; n++) {
+			uintptr_t p;
+
+			a[n].type = ap[n].attr_id;
+			a[n].valueLen = ap[n].b;
+			p = (uintptr_t)ap[n].a;
+			if (p) {
+				if ((p + a[n].valueLen) > blen) {
+					res = TEEC_ERROR_GENERIC;
+					goto out;
+				}
+				p += (uintptr_t)buf;
+			}
+			a[n].value = (void *)p;
+		}
+	}
+
+	res = TEEC_SUCCESS;
+out:
+	if (res == TEEC_SUCCESS)
+		*attr_count = num_attrs;
+
+	return res;
+}
+
 int main(int argc, char *argv[])
 {
 	TEEC_Result res;
@@ -143,6 +195,9 @@ int main(int argc, char *argv[])
 
 #if defined(CREATE_OBJ) || defined(ERASE_OBJ)
 	uint32_t obj_idx = 0;
+#endif
+#ifdef ATTRIBUTE_OBJ
+	uint32_t attr_count = 0, n, i;
 #endif
 
 	/* Initialize a context connecting us to the TEE */
@@ -291,6 +346,99 @@ int main(int argc, char *argv[])
 	printf("No of objects returned: %d\n", no_of_objects);
 
 	printf("TEE_FIND_OBJECTS successful\n");
+#endif
+
+#ifdef ATTRIBUTE_OBJ
+	/*
+	 * Execute a function in the TA by invoking it, in this case
+	 * to get SK key pair object attributes.
+	 *
+	 * The value of command ID part and how the parameters are
+	 * interpreted is part of the interface provided by the TA.
+	 */
+
+	memset(attrs, 0, sizeof(attrs));
+
+	attrs[0].type = SK_ATTR_OBJECT_TYPE;
+	attrs[1].type = SK_ATTR_LABEL;
+	attrs[2].type = SK_ATTR_MODULUS;
+
+	shm_in.size = get_attr_size(attrs, 3);
+	shm_in.flags = TEEC_MEM_INPUT | TEEC_MEM_OUTPUT;
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_AllocateSharedMemory failed with code 0x%x", res);
+		goto fail2;
+	}
+
+	res = pack_attrs(shm_in.buffer, shm_in.size, attrs, 3);
+	if (res != TEEC_SUCCESS) {
+		printf("pack_attrs failed with code 0x%x", res);
+		goto fail3;
+	}
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_MEMREF_WHOLE,
+					 TEEC_NONE, TEEC_NONE);
+	op.params[0].value.a = obj_idx;
+	op.params[1].memref.parent = &shm_in;
+	op.params[1].memref.offset = 0;
+	op.params[1].memref.size = shm_in.size;
+
+	printf("Invoking TEE_GET_OBJ_ATTRIBUTES\n");
+	res = TEEC_InvokeCommand(&sess, TEE_GET_OBJ_ATTRIBUTES, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		goto fail3;
+	}
+
+	unpack_sk_attrs((void *)shm_in.buffer, shm_in.size, attrs,
+			&attr_count);
+
+	printf("No of attributes returned: %d\n", attr_count);
+	for (n = 0; n < attr_count; n++) {
+		printf("Attr[%d].type: 0x%x\n", n, attrs[n].type);
+		printf("Attr[%d].valueLen: 0x%x\n", n, attrs[n].valueLen);
+		attrs[n].value = malloc(attrs[n].valueLen);
+	}
+
+	TEEC_ReleaseSharedMemory(&shm_in);
+	shm_in.size = get_attr_size(attrs, 3);
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_AllocateSharedMemory failed with code 0x%x", res);
+		goto fail2;
+	}
+
+	res = pack_attrs(shm_in.buffer, shm_in.size, attrs, 3);
+	if (res != TEEC_SUCCESS) {
+		printf("pack_attrs failed with code 0x%x", res);
+		goto fail3;
+	}
+
+	res = TEEC_InvokeCommand(&sess, TEE_GET_OBJ_ATTRIBUTES, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		goto fail3;
+	}
+
+	unpack_sk_attrs((void *)shm_in.buffer, shm_in.size, attrs,
+			&attr_count);
+
+	for (n = 0; n < attr_count; n++) {
+		printf("Attr[%d].type: 0x%x\n", n, attrs[n].type);
+		printf("Attr[%d].valueLen: 0x%x\n", n, attrs[n].valueLen);
+		printf("Attr[%d].value: 0x", n);
+		for (i = 0; i < attrs[n].valueLen; i++)
+			printf("%x", *((uint8_t *)attrs[n].value + i));
+		printf("\n");
+	}
+
+	printf("TEE_GET_OBJ_ATTRIBUTES successful\n");
 #endif
 
 	/*

@@ -37,9 +37,13 @@ TEE_Result pack_sk_attrs(const SK_ATTRIBUTE *attrs, uint32_t attr_count,
 		case SK_ATTR_KEY_TYPE:
 		case SK_ATTR_LABEL:
 		case SK_ATTR_MODULUS_BITS:
+		case SK_ATTR_MODULUS:
+		case SK_ATTR_PUBLIC_EXPONENT:
 			bl += sizeof(struct attr_packed);
-			/* Make room for padding */
-			bl += ROUNDUP(attrs[n].valueLen, 4);
+			if (attrs[n].value != NULL &&
+			    ((int16_t)attrs[n].valueLen) > 0)
+				/* Make room for padding */
+				bl += ROUNDUP(attrs[n].valueLen, 4);
 			attr_pack++;
 			break;
 		default:
@@ -66,10 +70,13 @@ TEE_Result pack_sk_attrs(const SK_ATTRIBUTE *attrs, uint32_t attr_count,
 		case SK_ATTR_KEY_TYPE:
 		case SK_ATTR_LABEL:
 		case SK_ATTR_MODULUS_BITS:
+		case SK_ATTR_MODULUS:
+		case SK_ATTR_PUBLIC_EXPONENT:
 			a[n].id = attrs[n].type;
 			a[n].b = attrs[n].valueLen;
 
-			if (attrs[n].valueLen == 0) {
+			if ((((int16_t)attrs[n].valueLen) <= 0) ||
+			    (attrs[n].value == NULL)) {
 				a[n].a = 0;
 				continue;
 			}
