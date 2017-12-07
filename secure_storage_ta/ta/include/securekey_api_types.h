@@ -4,6 +4,7 @@
 #ifndef _SECUREKEY_API_TYPES_H_
 #define _SECUREKEY_API_TYPES_H_
 
+#include <stdint.h>
 /*
  * Return Codes.
  */
@@ -11,16 +12,35 @@
 typedef uint16_t SK_RET_CODE;
 
 /* Error/status word */
-#define SKR_OK				(0x9000) /* Operation successfull */
+#define SKR_OK				(0x9000) /* Operation successful */
 
 #define SKR_ERR_NOT_SUPPORTED		(0x7080) /* The function and/or parameters are not supported by the library */
 
-#define SKR_ERR_MEMORY			(0x7020) /* Memory allocation error */
 #define SKR_ERR_GENERAL_ERROR		(0x7021) /* Non-specific error code */
-#define SKR_ERR_API_ERROR		(0x7023) /* Illegal parameter value passed to API */
-#define SKR_ERR_BUF_TOO_SMALL		(0x7026) /* Buffer provided is too small */
+#define SKR_ERR_SHORT_BUFFER		(0x7026) /* Buffer provided is too small */
 #define SKR_ERR_CRYPTO_ENGINE_FAILED	(0x7027) /* The crypto engine (implemented underneath a crypto abstraction layer) failed to provide a crypto service. */
 #define SKR_ERR_IDENT_IDX_RANGE		(0x7032) /* Identifier or Index of Reference Key is out of bounds */
+
+#define SKR_ERR_INIT_FAILED		(0x6001) /* If anything related to underlying component initialization failed */
+#define SKR_ERR_TEE_API			(0x6002) /* The return code is an error that originated within the TEE Client API implementation */
+#define SKR_ERR_TEE_COMM		(0x6003) /* Some error occured in communication stack b/w Rich OS and TEE */
+#define SKR_ERR_TEE_OS			(0x6004) /* The return code is an error that originated within the common TEE code. */
+
+#define SKR_ERR_ACCESS_DENIED		(0x6005) /* Access privileges are not sufficient */
+#define SKR_ERR_CANCEL			(0x6006) /* The operation was cancelled */
+#define SKR_ERR_ACCESS_CONFLICT		(0x6007) /* Concurrent accesses caused conflict*/
+#define SKR_ERR_EXCESS_DATA		(0x6008) /* Too much data for the requested operation was passed.*/
+#define SKR_ERR_BAD_FORMAT		(0x6009) /* Input data was of invalid format.*/
+#define SKR_ERR_BAD_PARAMETERS		(0x6010) /* Input parameters were invalid.*/
+#define SKR_ERR_BAD_STATE		(0x6011) /* Operation is not valid in the current state.*/
+#define SKR_ERR_ITEM_NOT_FOUND		(0x6012) /* The requested data item is not found.*/
+#define SKR_ERR_NOT_IMPLEMENTED	(0x6013) /* The requested operation should exist but is not yet implemented.*/
+#define SKR_ERR_NO_DATA			(0x6015) /* Expected data was missing.*/
+#define SKR_ERR_OUT_OF_MEMORY		(0x6016) /* System ran out of resources. */
+#define SKR_ERR_BUSY			(0x6017) /* The system is busy working on something else.*/
+#define SKR_ERR_COMMUNICATION		(0x6018) /* Communication with a remote party failed.*/
+#define SKR_ERR_SECURITY		(0x6019) /* A security fault was detected.*/
+#define SKR_ERR_OBJECT_HANDLE_INVALID	(0x6020) /* Object Handle Invalid */
 
 /*
  * A type for all the defines.
@@ -93,9 +113,16 @@ typedef SK_TYPE SK_MECHANISM_TYPE;
  */
 
 /*******************************************************************
- * For now we need only one Mechanism
+ * Mechanisms
  *******************************************************************/
-#define		SKM_RSA_PKCS		20
+#define		SKM_RSAES_PKCS1_V1_5			20
+#define		SKM_RSA_PKCS_NOPAD			21
+#define		SKM_RSASSA_PKCS1_V1_5_MD5		22
+#define		SKM_RSASSA_PKCS1_V1_5_SHA1		23
+#define		SKM_RSASSA_PKCS1_V1_5_SHA224		24
+#define		SKM_RSASSA_PKCS1_V1_5_SHA256		25
+#define		SKM_RSASSA_PKCS1_V1_5_SHA384		26
+#define		SKM_RSASSA_PKCS1_V1_5_SHA512		27
 
 /*
  * Specifying the required information in order to use a mechanism,
