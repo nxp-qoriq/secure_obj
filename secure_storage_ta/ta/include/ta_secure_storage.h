@@ -10,5 +10,7 @@
 #define TEE_FIND_OBJECTS		0x2
 #define TEE_GET_OBJ_ATTRIBUTES		0x3
 #define TEE_ERASE_OBJECT		0x4
+#define TEE_SIGN_DIGEST			0x5
+#define TEE_ENCRYPT_DATA		0x6
 
 #endif /*TA_SECURE_STORAGE_H*/
