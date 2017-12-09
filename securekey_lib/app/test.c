@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <securekey_api.h>
 #include "rsa_data.h"
 
@@ -103,7 +104,7 @@ static void do_EnumerateObject(void)
 	attrs[1].value = &key_type;
 	attrs[1].valueLen = sizeof(SK_KEY_TYPE);
 
-	ret = SK_EnumerateObjects(attrs, 2, hObject, MAX_FIND_OBJ_SIZE,
+	ret = SK_EnumerateObjects(NULL, 0, hObject, MAX_FIND_OBJ_SIZE,
 		&objCount);
 	if (ret != SKR_OK)
 		printf("SK_EnumerateObjects failed with code = 0x%x\n", ret);
@@ -114,6 +115,40 @@ static void do_EnumerateObject(void)
 	}
 }
 
+static void do_GetObjectAttributes(SK_OBJECT_HANDLE hObject)
+{
+	int ret, i = 0, n = 0;
+	SK_ATTRIBUTE attrs[2];
+	uint32_t attrCount = 2;
+	SK_OBJECT_TYPE obj_type;
+	SK_KEY_TYPE key_type;
+
+	/* Getting only RSA Keypair objects */
+	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * 2);
+
+	attrs[0].type = SK_ATTR_LABEL;
+	attrs[1].type = SK_ATTR_OBJECT_INDEX;
+
+	ret = SK_GetObjectAttribute(hObject, attrs, attrCount);
+	if (ret != SKR_OK)
+		printf("SK_GetObjectAttribute failed with code = 0x%x\n", ret);
+	else {
+		printf("SK_GetObjectAttribute successful\n");
+		printf("attrCount = %d\n", attrCount);
+		for (n = 0; n < attrCount; n++) {
+			printf("Attr[%d].type: 0x%x\n", n, attrs[n].type);
+			printf("Attr[%d].valueLen: 0x%x\n", n, attrs[n].valueLen);
+#if 0
+			printf("Attr[%d].value: 0x", n);
+			for (i = 0; i < attrs[n].valueLen; i++)
+				printf("%x", *(((uint8_t *)attrs[n].value) + i));
+			printf("\n");
+#endif
+		}
+	}
+}
+
+
 int main(int argc, char *argv[])
 {
 	SK_OBJECT_HANDLE obj1;
@@ -122,6 +157,7 @@ int main(int argc, char *argv[])
 	if (obj1 == SKR_ERR_OBJECT_HANDLE_INVALID)
 		return -1;
 
+	do_GetObjectAttributes(obj1);
 	do_EnumerateObject();
 	do_EraseObject(obj1);
 	do_EnumerateObject();

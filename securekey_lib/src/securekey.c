@@ -60,6 +60,57 @@ static uint32_t pack_attrs(uint8_t *buffer, size_t size,
 	return SKR_OK;
 }
 
+static uint32_t unpack_sk_attrs(const uint8_t *buf, size_t blen,
+			 SK_ATTRIBUTE *attrs, uint32_t *attr_count)
+{
+	uint32_t res = TEEC_SUCCESS;
+	SK_ATTRIBUTE *a = NULL;
+	const struct tee_attr_packed *ap;
+	size_t num_attrs = 0;
+	const size_t num_attrs_size = sizeof(uint32_t);
+
+	if (blen == 0)
+		goto out;
+
+	if (((uintptr_t)buf & 0x3) != 0 || blen < num_attrs_size)
+		return TEEC_ERROR_GENERIC;
+	num_attrs = *(uint32_t *) (void *)buf;
+
+	if ((blen - num_attrs_size) < (num_attrs * sizeof(*ap)))
+		return TEEC_ERROR_GENERIC;
+
+	ap = (const struct tee_attr_packed *)(buf + num_attrs_size);
+
+	if (num_attrs > 0) {
+		size_t n;
+
+		a = attrs;
+		for (n = 0; n < num_attrs; n++) {
+			uintptr_t p;
+			a[n].type = ap[n].attr_id;
+			a[n].valueLen = ap[n].b;
+			p = (uintptr_t)ap[n].a;
+			if (p) {
+				if ((p + a[n].valueLen) > blen) {
+					res = TEEC_ERROR_GENERIC;
+					goto out;
+				}
+				p += (uintptr_t)buf;
+
+			}
+			if (p)
+				memcpy(a[n].value, (void *)p, a[n].valueLen);
+		}
+	}
+
+	res = TEEC_SUCCESS;
+out:
+	if (res == TEEC_SUCCESS)
+		*attr_count = num_attrs;
+
+	return res;
+}
+
 static SK_RET_CODE map_teec_err_to_sk(TEEC_Result tee_ret,
 	uint32_t err_origin)
 {
@@ -161,8 +212,8 @@ static size_t get_attr_size(SK_ATTRIBUTE *attrs, uint32_t attr_cnt)
 
 SK_FUNCTION_LIST global_function_list = {
 	.SK_EnumerateObjects	=	SK_EnumerateObjects,
-#if 0
 	.SK_GetObjectAttribute	=	SK_GetObjectAttribute,
+#if 0
 	.SK_GetSupportedMechanisms =	SK_GetSupportedMechanisms,
 	.SK_Sign			=	SK_Sign,
 #endif
@@ -307,8 +358,7 @@ SK_RET_CODE SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
 	uint32_t err_origin;
 	SK_RET_CODE ret = SKR_OK;
 
-	if (pTemplate == NULL ||
-		phObject == NULL || pulObjectCount == NULL)
+	if (phObject == NULL || pulObjectCount == NULL)
 		ret = SKR_ERR_BAD_PARAMETERS;
 
 	/* Initialize a context connecting us to the TEE */
@@ -389,6 +439,82 @@ end:
 	return ret;
 }
 
+SK_RET_CODE SK_GetObjectAttribute(SK_OBJECT_HANDLE hObject,
+		SK_ATTRIBUTE *attribute, uint32_t attrCount)
+{
+	TEEC_Result res;
+	TEEC_Context ctx;
+	TEEC_Session sess;
+	TEEC_Operation op;
+	TEEC_UUID uuid = TA_SECURE_STORAGE_UUID;
+	TEEC_SharedMemory shm_in;
+	uint32_t err_origin;
+	SK_RET_CODE ret = SKR_OK;
+
+	if (attribute == NULL || attrCount <= 0)
+		ret = SKR_ERR_BAD_PARAMETERS;
+
+	/* Initialize a context connecting us to the TEE */
+	res = TEEC_InitializeContext(NULL, &ctx);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto end;
+	}
+
+	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail1;
+	}
+
+	shm_in.size = get_attr_size(attribute, attrCount);
+	shm_in.flags = TEEC_MEM_INPUT | TEEC_MEM_OUTPUT;
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_AllocateSharedMemory failed with code 0x%x", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail2;
+	}
+
+	res = pack_attrs(shm_in.buffer, shm_in.size, attribute, attrCount);
+	if (res != SKR_OK) {
+		printf("pack_attrs failed with code 0x%x", res);
+		ret = res;
+		goto fail3;
+	}
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_MEMREF_WHOLE,
+					 TEEC_NONE, TEEC_NONE);
+	op.params[0].value.a = hObject;
+	op.params[1].memref.parent = &shm_in;
+	op.params[1].memref.offset = 0;
+	op.params[1].memref.size = shm_in.size;
+
+	res = TEEC_InvokeCommand(&sess, TEE_GET_OBJ_ATTRIBUTES, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail3;
+	}
+
+	unpack_sk_attrs((void *)shm_in.buffer, shm_in.size, attribute,
+			&attrCount);
+
+fail3:
+	TEEC_ReleaseSharedMemory(&shm_in);
+fail2:
+	TEEC_CloseSession(&sess);
+fail1:
+	TEEC_FinalizeContext(&ctx);
+end:
+	return ret;
+}
 SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
 {
 	if (ppFuncList == NULL)

@@ -14,7 +14,7 @@ struct SK_FUNCTION_LIST {
 			uint32_t attrCount, SK_OBJECT_HANDLE *phObject,
 			uint32_t maxObjects, uint32_t *pulObjectCount);
 	SK_RET_CODE(*SK_GetObjectAttribute)(SK_OBJECT_HANDLE hObject,
-			SK_ATTRIBUTE *attribute, uint16_t attrCount);
+			SK_ATTRIBUTE *attribute, uint32_t attrCount);
 	SK_RET_CODE(*SK_GetSupportedMechanisms)(SK_MECHANISM_TYPE *mechanism,
 			uint16_t *mechanismLen);
 	SK_RET_CODE(*SK_Sign)(SK_MECHANISM_INFO *pMechanismType,
@@ -44,7 +44,7 @@ SK_RET_CODE	SK_CreateObject(SK_ATTRIBUTE *attr,
 SK_RET_CODE	SK_EraseObject(SK_OBJECT_HANDLE hObject);
 
 SK_RET_CODE	SK_GetObjectAttribute(SK_OBJECT_HANDLE hObject,
-		SK_ATTRIBUTE *attribute, uint16_t attrCount);
+		SK_ATTRIBUTE *attribute, uint32_t attrCount);
 
 /*******************************************************************/
 /* Cryptographic Operations*/
