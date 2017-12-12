@@ -16,13 +16,6 @@ struct tee_attr_packed {
 /* Round up the even multiple of size, size has to be a multiple of 2 */
 #define ROUNDUP(v, size) (((v) + (size - 1)) & ~(size - 1))
 
-SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
-		uint16_t attrCount, SK_OBJECT_HANDLE *phObject);
-
-SK_RET_CODE SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
-		uint32_t attrCount, SK_OBJECT_HANDLE *phObject,
-		uint32_t maxObjects, uint32_t *pulObjectCount);
-
 static uint32_t pack_attrs(uint8_t *buffer, size_t size,
 		SK_ATTRIBUTE *attrs, uint32_t attr_cnt)
 {
@@ -213,10 +206,8 @@ static size_t get_attr_size(SK_ATTRIBUTE *attrs, uint32_t attr_cnt)
 SK_FUNCTION_LIST global_function_list = {
 	.SK_EnumerateObjects	=	SK_EnumerateObjects,
 	.SK_GetObjectAttribute	=	SK_GetObjectAttribute,
-#if 0
-	.SK_GetSupportedMechanisms =	SK_GetSupportedMechanisms,
-	.SK_Sign			=	SK_Sign,
-#endif
+	.SK_Sign		=	SK_Sign,
+	.SK_Encrypt		=	SK_Encrypt,
 };
 
 SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
@@ -515,6 +506,193 @@ fail1:
 end:
 	return ret;
 }
+
+SK_RET_CODE SK_Sign(SK_MECHANISM_INFO *pMechanismType,
+		SK_OBJECT_HANDLE hObject, const uint8_t *inDigest,
+		uint16_t inDigestLen, uint8_t *outSignature,
+		uint16_t *outSignatureLen)
+{
+	TEEC_Result res;
+	TEEC_Context ctx;
+	TEEC_Session sess;
+	TEEC_Operation op;
+	TEEC_UUID uuid = TA_SECURE_STORAGE_UUID;
+	TEEC_SharedMemory shm_in, shm_out;
+	uint32_t err_origin;
+	SK_RET_CODE ret = SKR_OK;
+
+	if ((pMechanismType == NULL) || (inDigest == NULL) ||
+	    (inDigestLen == 0) ||
+	    ((outSignature == NULL) && (*outSignatureLen != 0)))
+		ret = SKR_ERR_BAD_PARAMETERS;
+
+	/* Initialize a context connecting us to the TEE */
+	res = TEEC_InitializeContext(NULL, &ctx);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto end;
+	}
+
+	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail1;
+	}
+
+	shm_in.size = inDigestLen;
+	shm_in.flags = TEEC_MEM_INPUT;
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail2;
+	}
+
+	memcpy(shm_in.buffer, inDigest, shm_in.size);
+
+	shm_out.size = *outSignatureLen;
+	shm_out.flags = TEEC_MEM_OUTPUT;
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm_out);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail3;
+	}
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_MEMREF_WHOLE,
+					 TEEC_MEMREF_WHOLE, TEEC_NONE);
+	op.params[0].value.a = hObject;
+	op.params[0].value.b = pMechanismType->mechanism;
+	op.params[1].memref.parent = &shm_in;
+	op.params[1].memref.offset = 0;
+	op.params[1].memref.size = shm_in.size;
+	op.params[2].memref.parent = &shm_out;
+	op.params[2].memref.offset = 0;
+	op.params[2].memref.size = shm_out.size;
+
+	printf("Invoking TEE_SIGN_DIGEST\n");
+	res = TEEC_InvokeCommand(&sess, TEE_SIGN_DIGEST, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail4;
+	}
+
+	*outSignatureLen = op.params[2].memref.size;
+
+	if (outSignature)
+		memcpy(outSignature, shm_out.buffer, *outSignatureLen);
+fail4:
+	TEEC_ReleaseSharedMemory(&shm_out);
+fail3:
+	TEEC_ReleaseSharedMemory(&shm_in);
+fail2:
+	TEEC_CloseSession(&sess);
+fail1:
+	TEEC_FinalizeContext(&ctx);
+end:
+	return ret;
+}
+
+SK_RET_CODE SK_Encrypt(SK_MECHANISM_INFO *pMechanismType,
+		SK_OBJECT_HANDLE hObject, const uint8_t *inData,
+		uint16_t inDataLen, uint8_t *outData, uint16_t *outDataLen)
+{
+	TEEC_Result res;
+	TEEC_Context ctx;
+	TEEC_Session sess;
+	TEEC_Operation op;
+	TEEC_UUID uuid = TA_SECURE_STORAGE_UUID;
+	TEEC_SharedMemory shm_in, shm_out;
+	uint32_t err_origin;
+	SK_RET_CODE ret = SKR_OK;
+
+	if ((pMechanismType == NULL) || (inData == NULL) ||
+	    (inDataLen == 0) || ((outData == NULL) && (*outDataLen != 0)))
+		ret = SKR_ERR_BAD_PARAMETERS;
+
+	/* Initialize a context connecting us to the TEE */
+	res = TEEC_InitializeContext(NULL, &ctx);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto end;
+	}
+
+	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail1;
+	}
+
+	shm_in.size = inDataLen;
+	shm_in.flags = TEEC_MEM_INPUT;
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail2;
+	}
+
+	memcpy(shm_in.buffer, inData, shm_in.size);
+
+	shm_out.size = *outDataLen;
+	shm_out.flags = TEEC_MEM_OUTPUT;
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm_out);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail3;
+	}
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_MEMREF_WHOLE,
+					 TEEC_MEMREF_WHOLE, TEEC_NONE);
+	op.params[0].value.a = hObject;
+	op.params[0].value.b = pMechanismType->mechanism;
+	op.params[1].memref.parent = &shm_in;
+	op.params[1].memref.offset = 0;
+	op.params[1].memref.size = shm_in.size;
+	op.params[2].memref.parent = &shm_out;
+	op.params[2].memref.offset = 0;
+	op.params[2].memref.size = shm_out.size;
+
+	printf("Invoking TEE_ENCRYPT_DATA\n");
+	res = TEEC_InvokeCommand(&sess, TEE_ENCRYPT_DATA, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail4;
+	}
+
+	*outDataLen = op.params[2].memref.size;
+
+	if (outData)
+		memcpy(outData, shm_out.buffer, *outDataLen);
+fail4:
+	TEEC_ReleaseSharedMemory(&shm_out);
+fail3:
+	TEEC_ReleaseSharedMemory(&shm_in);
+fail2:
+	TEEC_CloseSession(&sess);
+fail1:
+	TEEC_FinalizeContext(&ctx);
+end:
+	return ret;
+}
+
 SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
 {
 	if (ppFuncList == NULL)

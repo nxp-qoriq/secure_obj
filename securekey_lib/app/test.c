@@ -148,6 +148,71 @@ static void do_GetObjectAttributes(SK_OBJECT_HANDLE hObject)
 	}
 }
 
+static void do_Sign(SK_OBJECT_HANDLE hObject)
+{
+	int ret, n = 0;
+	SK_MECHANISM_INFO mechanismType = {0};
+	uint8_t *signature = NULL;
+	uint16_t signatureLen = 0;
+
+	mechanismType.mechanism = SKM_RSASSA_PKCS1_V1_5_SHA256;
+
+	ret = SK_Sign(&mechanismType, hObject, rsa_digest_sha256,
+		      sizeof(rsa_digest_sha256), signature, &signatureLen);
+	if (ret != SKR_OK)
+		printf("SK_Sign1 failed with code = 0x%x\n", ret);
+
+	/* Convert signature length into bytes */
+	signatureLen = signatureLen/8;
+
+	signature = (uint8_t *)malloc(signatureLen);
+
+	ret = SK_Sign(&mechanismType, hObject, rsa_digest_sha256,
+		      sizeof(rsa_digest_sha256), signature, &signatureLen);
+	if (ret != SKR_OK)
+		printf("SK_Sign2 failed with code = 0x%x\n", ret);
+
+	printf("SK_Sign successful\n");
+	printf("Signature:\n 0x");
+	for (n = 0; n < signatureLen; n++)
+		printf("%x", *(signature + n));
+	printf("\n");
+
+	free(signature);
+}
+
+static void do_Encrypt(SK_OBJECT_HANDLE hObject)
+{
+	int ret, n = 0;
+	SK_MECHANISM_INFO mechanismType = {0};
+	uint8_t *encData = NULL;
+	uint16_t encDataLen = 0;
+
+	mechanismType.mechanism = SKM_RSAES_PKCS1_V1_5;
+
+	ret = SK_Encrypt(&mechanismType, hObject, rsa_data,
+			 sizeof(rsa_data), encData, &encDataLen);
+	if (ret != SKR_OK)
+		printf("SK_Encrypt1 failed with code = 0x%x\n", ret);
+
+	/* Convert signature length into bytes */
+	encDataLen = encDataLen/8;
+
+	encData = (uint8_t *)malloc(encDataLen);
+
+	ret = SK_Encrypt(&mechanismType, hObject, rsa_data,
+			 sizeof(rsa_data), encData, &encDataLen);
+	if (ret != SKR_OK)
+		printf("SK_Encrypt2 failed with code = 0x%x\n", ret);
+
+	printf("SK_Encrypt successful\n");
+	printf("Encrypted Data:\n 0x");
+	for (n = 0; n < encDataLen; n++)
+		printf("%x", *(encData + n));
+	printf("\n");
+
+	free(encData);
+}
 
 int main(int argc, char *argv[])
 {
@@ -159,6 +224,8 @@ int main(int argc, char *argv[])
 
 	do_GetObjectAttributes(obj1);
 	do_EnumerateObject();
+	do_Sign(obj1);
+	do_Encrypt(obj1);
 	do_EraseObject(obj1);
 	do_EnumerateObject();
 	return 0;
