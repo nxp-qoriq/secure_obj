@@ -203,13 +203,6 @@ static size_t get_attr_size(SK_ATTRIBUTE *attrs, uint32_t attr_cnt)
 	return size;
 }
 
-SK_FUNCTION_LIST global_function_list = {
-	.SK_EnumerateObjects	=	SK_EnumerateObjects,
-	.SK_GetObjectAttribute	=	SK_GetObjectAttribute,
-	.SK_Sign		=	SK_Sign,
-	.SK_Encrypt		=	SK_Encrypt,
-};
-
 SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
 		uint16_t attrCount, SK_OBJECT_HANDLE *phObject)
 {
@@ -693,10 +686,17 @@ end:
 	return ret;
 }
 
+static SK_FUNCTION_LIST global_function_list;
+
 SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
 {
 	if (ppFuncList == NULL)
 		return SKR_ERR_BAD_PARAMETERS;
+
+	global_function_list.SK_EnumerateObjects = SK_EnumerateObjects;
+	global_function_list.SK_GetObjectAttribute = SK_GetObjectAttribute;
+	global_function_list.SK_Sign = SK_Sign;
+	global_function_list.SK_Encrypt = SK_Encrypt;
 
 	*ppFuncList = &global_function_list;
 
