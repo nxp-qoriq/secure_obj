@@ -15,12 +15,14 @@ struct SK_FUNCTION_LIST {
 			uint32_t maxObjects, uint32_t *pulObjectCount);
 	SK_RET_CODE(*SK_GetObjectAttribute)(SK_OBJECT_HANDLE hObject,
 			SK_ATTRIBUTE *attribute, uint32_t attrCount);
-	SK_RET_CODE(*SK_GetSupportedMechanisms)(SK_MECHANISM_TYPE *mechanism,
-			uint16_t *mechanismLen);
 	SK_RET_CODE(*SK_Sign)(SK_MECHANISM_INFO *pMechanismType,
-			SK_OBJECT_HANDLE hObject, uint8_t *inData,
-			uint16_t inDataLen, uint8_t *outSignature,
+			SK_OBJECT_HANDLE hObject, const uint8_t *inDigest,
+			uint16_t inDigestLen, uint8_t *outSignature,
 			uint16_t *outSignatureLen);
+	SK_RET_CODE(*SK_Encrypt)(SK_MECHANISM_INFO * pMechanismType,
+			SK_OBJECT_HANDLE hObject, const uint8_t *inData,
+			uint16_t inDataLen,	uint8_t *outData,
+			uint16_t *outDataLen);
 };
 
 typedef struct SK_FUNCTION_LIST SK_FUNCTION_LIST;
@@ -49,11 +51,13 @@ SK_RET_CODE	SK_GetObjectAttribute(SK_OBJECT_HANDLE hObject,
 /*******************************************************************/
 /* Cryptographic Operations*/
 /*******************************************************************/
-SK_RET_CODE	SK_GetSupportedMechanisms(SK_MECHANISM_TYPE *mechanism,
-		uint16_t *mechanismLen);
-
 SK_RET_CODE	SK_Sign(SK_MECHANISM_INFO *pMechanismType,
-		SK_OBJECT_HANDLE hObject, uint8_t *inData, uint16_t inDataLen,
-		uint8_t *outSignature, uint16_t *outSignatureLen);
+		SK_OBJECT_HANDLE hObject, const uint8_t *inDigest,
+		uint16_t inDigestLen, uint8_t *outSignature,
+		uint16_t *outSignatureLen);
+
+SK_RET_CODE	SK_Encrypt(SK_MECHANISM_INFO *pMechanismType,
+		SK_OBJECT_HANDLE hObject, const uint8_t *inData,
+		uint16_t inDataLen, uint8_t *outData, uint16_t *outDataLen);
 
 #endif /* _SECUREKEY_API_H_*/

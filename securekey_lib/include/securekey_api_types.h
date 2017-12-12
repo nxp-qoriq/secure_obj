@@ -26,7 +26,7 @@ typedef uint16_t SK_RET_CODE;
 #define SKR_ERR_TEE_COMM		(0x6003) /* Some error occured in communication stack b/w Rich OS and TEE */
 #define SKR_ERR_TEE_OS			(0x6004) /* The return code is an error that originated within the common TEE code. */
 
-#define SKR_ERR_ACCESS_DENIED		(0x6005) /* Access privileges are not sufficient */ 
+#define SKR_ERR_ACCESS_DENIED		(0x6005) /* Access privileges are not sufficient */
 #define SKR_ERR_CANCEL			(0x6006) /* The operation was cancelled */
 #define SKR_ERR_ACCESS_CONFLICT		(0x6007) /* Concurrent accesses caused conflict*/
 #define SKR_ERR_EXCESS_DATA		(0x6008) /* Too much data for the requested operation was passed.*/
@@ -38,7 +38,7 @@ typedef uint16_t SK_RET_CODE;
 #define SKR_ERR_NO_DATA			(0x6015) /* Expected data was missing.*/
 #define SKR_ERR_OUT_OF_MEMORY		(0x6016) /* System ran out of resources. */
 #define SKR_ERR_BUSY			(0x6017) /* The system is busy working on something else.*/
-#define SKR_ERR_COMMUNICATION 		(0x6018) /* Communication with a remote party failed.*/
+#define SKR_ERR_COMMUNICATION		(0x6018) /* Communication with a remote party failed.*/
 #define SKR_ERR_SECURITY		(0x6019) /* A security fault was detected.*/
 #define SKR_ERR_OBJECT_HANDLE_INVALID	(0x6020) /* Object Handle Invalid */
 
@@ -113,9 +113,16 @@ typedef SK_TYPE SK_MECHANISM_TYPE;
  */
 
 /*******************************************************************
- * For now we need only one Mechanism
+ * Mechanisms
  *******************************************************************/
-#define		SKM_RSA_PKCS		20
+#define		SKM_RSAES_PKCS1_V1_5			20
+#define		SKM_RSA_PKCS_NOPAD			21
+#define		SKM_RSASSA_PKCS1_V1_5_MD5		22
+#define		SKM_RSASSA_PKCS1_V1_5_SHA1		23
+#define		SKM_RSASSA_PKCS1_V1_5_SHA224		24
+#define		SKM_RSASSA_PKCS1_V1_5_SHA256		25
+#define		SKM_RSASSA_PKCS1_V1_5_SHA384		26
+#define		SKM_RSASSA_PKCS1_V1_5_SHA512		27
 
 /*
  * Specifying the required information in order to use a mechanism,
