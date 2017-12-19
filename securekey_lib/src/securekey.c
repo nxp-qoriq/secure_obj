@@ -342,8 +342,10 @@ SK_RET_CODE SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
 	uint32_t err_origin;
 	SK_RET_CODE ret = SKR_OK;
 
-	if (phObject == NULL || pulObjectCount == NULL)
+	if (phObject == NULL || pulObjectCount == NULL) {
 		ret = SKR_ERR_BAD_PARAMETERS;
+		goto end;
+	}
 
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
@@ -516,8 +518,10 @@ SK_RET_CODE SK_Sign(SK_MECHANISM_INFO *pMechanismType,
 
 	if ((pMechanismType == NULL) || (inDigest == NULL) ||
 	    (inDigestLen == 0) ||
-	    ((outSignature == NULL) && (*outSignatureLen != 0)))
+	    ((outSignature == NULL) && (*outSignatureLen != 0))) {
 		ret = SKR_ERR_BAD_PARAMETERS;
+		goto end;
+	}
 
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
@@ -608,9 +612,10 @@ SK_RET_CODE SK_Decrypt(SK_MECHANISM_INFO *pMechanismType,
 	SK_RET_CODE ret = SKR_OK;
 
 	if ((pMechanismType == NULL) || (inData == NULL) ||
-	    (inDataLen == 0) || ((outData == NULL) && (*outDataLen != 0)))
+	    (inDataLen == 0) || ((outData == NULL) && (*outDataLen != 0))) {
 		ret = SKR_ERR_BAD_PARAMETERS;
-
+		goto end;
+	}
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
 	if (res != TEEC_SUCCESS) {
