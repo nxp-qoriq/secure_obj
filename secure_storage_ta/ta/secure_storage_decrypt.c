@@ -4,7 +4,7 @@
 #include "string.h"
 #include "secure_storage_common.h"
 
-TEE_Result TA_EncryptData(uint32_t param_types, TEE_Param params[4])
+TEE_Result TA_DecryptData(uint32_t param_types, TEE_Param params[4])
 {
 	TEE_Result res;
 	TEE_ObjectHandle pObject = TEE_HANDLE_NULL, tObject = TEE_HANDLE_NULL;
@@ -65,7 +65,7 @@ TEE_Result TA_EncryptData(uint32_t param_types, TEE_Param params[4])
 	}
 
 	DMSG("Allocate Operation!\n");
-	res = TEE_AllocateOperation(&operation, algorithm, TEE_MODE_ENCRYPT,
+	res = TEE_AllocateOperation(&operation, algorithm, TEE_MODE_DECRYPT,
 				    objectInfo.objectSize);
 	if (res != TEE_SUCCESS)
 		goto out;
@@ -75,8 +75,8 @@ TEE_Result TA_EncryptData(uint32_t param_types, TEE_Param params[4])
 	if (res != TEE_SUCCESS)
 		goto out;
 
-	DMSG("Asymetric Encrypt Data!\n");
-	res = TEE_AsymmetricEncrypt(operation, NULL, 0,
+	DMSG("Asymetric Decrypt Data!\n");
+	res = TEE_AsymmetricDecrypt(operation, NULL, 0,
 				    params[1].memref.buffer,
 				    params[1].memref.size,
 				    params[2].memref.buffer,

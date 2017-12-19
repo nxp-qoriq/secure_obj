@@ -22,8 +22,8 @@ TEE_Result TA_GetObjectAttributes(uint32_t param_types, TEE_Param params[4]);
 /* Sign Digest API */
 TEE_Result TA_SignDigest(uint32_t param_types, TEE_Param params[4]);
 
-/* Encrypt Data API */
-TEE_Result TA_EncryptData(uint32_t param_types, TEE_Param params[4]);
+/* Decrypt Data API */
+TEE_Result TA_DecryptData(uint32_t param_types, TEE_Param params[4]);
 
 /* Helper API's declaration */
 TEE_Result pack_sk_attrs(const SK_ATTRIBUTE *attrs, uint32_t attr_count,

@@ -594,7 +594,7 @@ end:
 	return ret;
 }
 
-SK_RET_CODE SK_Encrypt(SK_MECHANISM_INFO *pMechanismType,
+SK_RET_CODE SK_Decrypt(SK_MECHANISM_INFO *pMechanismType,
 		SK_OBJECT_HANDLE hObject, const uint8_t *inData,
 		uint16_t inDataLen, uint8_t *outData, uint16_t *outDataLen)
 {
@@ -661,8 +661,8 @@ SK_RET_CODE SK_Encrypt(SK_MECHANISM_INFO *pMechanismType,
 	op.params[2].memref.offset = 0;
 	op.params[2].memref.size = shm_out.size;
 
-	printf("Invoking TEE_ENCRYPT_DATA\n");
-	res = TEEC_InvokeCommand(&sess, TEE_ENCRYPT_DATA, &op,
+	printf("Invoking TEE_DECRYPT_DATA\n");
+	res = TEEC_InvokeCommand(&sess, TEE_DECRYPT_DATA, &op,
 				 &err_origin);
 	if (res != TEEC_SUCCESS) {
 		printf("TEEC_InvokeCommand failed with code 0x%x", res);
@@ -696,7 +696,7 @@ SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
 	global_function_list.SK_EnumerateObjects = SK_EnumerateObjects;
 	global_function_list.SK_GetObjectAttribute = SK_GetObjectAttribute;
 	global_function_list.SK_Sign = SK_Sign;
-	global_function_list.SK_Encrypt = SK_Encrypt;
+	global_function_list.SK_Decrypt = SK_Decrypt;
 
 	*ppFuncList = &global_function_list;
 

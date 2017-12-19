@@ -181,37 +181,37 @@ static void do_Sign(SK_OBJECT_HANDLE hObject)
 	free(signature);
 }
 
-static void do_Encrypt(SK_OBJECT_HANDLE hObject)
+static void do_Decrypt(SK_OBJECT_HANDLE hObject)
 {
 	int ret, n = 0;
 	SK_MECHANISM_INFO mechanismType = {0};
-	uint8_t *encData = NULL;
-	uint16_t encDataLen = 0;
+	uint8_t *decData = NULL;
+	uint16_t decDataLen = 0;
 
-	mechanismType.mechanism = SKM_RSAES_PKCS1_V1_5;
+	mechanismType.mechanism = SKM_RSA_PKCS_NOPAD;
 
-	ret = SK_Encrypt(&mechanismType, hObject, rsa_data,
-			 sizeof(rsa_data), encData, &encDataLen);
+	ret = SK_Decrypt(&mechanismType, hObject, rsa_data,
+			 sizeof(rsa_data), decData, &decDataLen);
 	if (ret != SKR_OK)
-		printf("SK_Encrypt1 failed with code = 0x%x\n", ret);
+		printf("SK_Decrypt1 failed with code = 0x%x\n", ret);
 
 	/* Convert signature length into bytes */
-	encDataLen = encDataLen/8;
+	decDataLen = decDataLen/8;
 
-	encData = (uint8_t *)malloc(encDataLen);
+	decData = (uint8_t *)malloc(decDataLen);
 
-	ret = SK_Encrypt(&mechanismType, hObject, rsa_data,
-			 sizeof(rsa_data), encData, &encDataLen);
+	ret = SK_Decrypt(&mechanismType, hObject, rsa_data,
+			 sizeof(rsa_data), decData, &decDataLen);
 	if (ret != SKR_OK)
-		printf("SK_Encrypt2 failed with code = 0x%x\n", ret);
+		printf("SK_Decrypt2 failed with code = 0x%x\n", ret);
 
-	printf("SK_Encrypt successful\n");
-	printf("Encrypted Data:\n 0x");
-	for (n = 0; n < encDataLen; n++)
-		printf("%x", *(encData + n));
+	printf("SK_Decrypt successful\n");
+	printf("Decrypted Data:\n 0x");
+	for (n = 0; n < decDataLen; n++)
+		printf("%x", *(decData + n));
 	printf("\n");
 
-	free(encData);
+	free(decData);
 }
 
 int main(int argc, char *argv[])
@@ -225,7 +225,7 @@ int main(int argc, char *argv[])
 	do_GetObjectAttributes(obj1);
 	do_EnumerateObject();
 	do_Sign(obj1);
-	do_Encrypt(obj1);
+	do_Decrypt(obj1);
 	do_EraseObject(obj1);
 	do_EnumerateObject();
 	return 0;

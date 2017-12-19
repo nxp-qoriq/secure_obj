@@ -81,8 +81,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void *sess_ctx, uint32_t cmd_id,
 		return TA_EraseObject(param_types, params);
 	case TEE_SIGN_DIGEST:
 		return TA_SignDigest(param_types, params);
-	case TEE_ENCRYPT_DATA:
-		return TA_EncryptData(param_types, params);
+	case TEE_DECRYPT_DATA:
+		return TA_DecryptData(param_types, params);
 	default:
 		return TEE_ERROR_BAD_PARAMETERS;
 	}
