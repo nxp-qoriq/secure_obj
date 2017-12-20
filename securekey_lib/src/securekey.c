@@ -13,6 +13,28 @@ struct tee_attr_packed {
 	uint32_t b;
 };
 
+#define	PRINT_ERROR
+//#define	PRINT_INFO
+
+#ifdef PRINT_ERROR
+#define print_error(msg, ...) { \
+printf("[securekey_lib:%s, %d] Error: ", __func__, __LINE__); \
+printf(msg, ##__VA_ARGS__); \
+}
+#else
+#define print_error(msg, ...)
+#endif
+
+#ifdef PRINT_INFO
+#define print_info(msg, ...) { \
+printf("[securekey_lib:%s, %d] Info: ", __func__, __LINE__); \
+printf(msg, ##__VA_ARGS__); \
+}
+#else
+#define print_info(msg, ...)
+#endif
+
+
 /* Round up the even multiple of size, size has to be a multiple of 2 */
 #define ROUNDUP(v, size) (((v) + (size - 1)) & ~(size - 1))
 
@@ -221,7 +243,7 @@ SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		print_error("TEEC_InitializeContext failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto end;
 	}
@@ -229,7 +251,7 @@ SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
 	res = TEEC_OpenSession(&ctx, &sess, &uuid,
 			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		print_error("TEEC_Opensession failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail1;
 	}
@@ -239,14 +261,14 @@ SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
 
 	res = TEEC_AllocateSharedMemory(&ctx, &shm);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto fail2;
 	}
 
 	res = pack_attrs(shm.buffer, shm.size, attr, attrCount);
 	if (res != SKR_OK) {
-		printf("pack_attrs failed with code 0x%x\n", res);
+		print_error("pack_attrs failed with code 0x%x\n", res);
 		ret = res;
 		goto fail3;
 	}
@@ -258,17 +280,17 @@ SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
 	op.params[0].memref.offset = 0;
 	op.params[0].memref.size = shm.size;
 
-	printf("Invoking TEE_CREATE_OBJECT\n");
+	print_info("Invoking TEE_CREATE_OBJECT\n");
 	res = TEEC_InvokeCommand(&sess, TEE_CREATE_OBJECT, &op,
 			&err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InvokeCommand failed with code 0x%x\n", res);
+		print_error("TEEC_InvokeCommand failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail3;
 	}
 	*phObject = op.params[1].value.a;
 
-	printf("TEE_CREATE_OBJECT successful\n");
+	print_info("TEE_CREATE_OBJECT successful\n");
 
 fail3:
 	TEEC_ReleaseSharedMemory(&shm);
@@ -293,7 +315,7 @@ SK_RET_CODE SK_EraseObject(SK_OBJECT_HANDLE hObject)
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		print_error("TEEC_InitializeContext failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto end;
 	}
@@ -301,7 +323,7 @@ SK_RET_CODE SK_EraseObject(SK_OBJECT_HANDLE hObject)
 	res = TEEC_OpenSession(&ctx, &sess, &uuid,
 			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		print_error("TEEC_Opensession failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail1;
 	}
@@ -311,15 +333,15 @@ SK_RET_CODE SK_EraseObject(SK_OBJECT_HANDLE hObject)
 					 TEEC_NONE, TEEC_NONE);
 	op.params[0].value.a = hObject;
 
-	printf("Invoking TEE_ERASE_OBJECT\n");
+	print_info("Invoking TEE_ERASE_OBJECT\n");
 	res = TEEC_InvokeCommand(&sess, TEE_ERASE_OBJECT, &op,
 				 &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		print_error("TEEC_InvokeCommand failed with code 0x%x", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail2;
 	}
-	printf("TEE_ERASE_OBJECT successful\n");
+	print_info("TEE_ERASE_OBJECT successful\n");
 
 fail2:
 	TEEC_CloseSession(&sess);
@@ -350,7 +372,7 @@ SK_RET_CODE SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		print_error("TEEC_InitializeContext failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto end;
 	}
@@ -358,7 +380,7 @@ SK_RET_CODE SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
 	res = TEEC_OpenSession(&ctx, &sess, &uuid,
 			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		print_error("TEEC_Opensession failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail1;
 	}
@@ -368,14 +390,14 @@ SK_RET_CODE SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
 
 	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto fail2;
 	}
 
 	res = pack_attrs(shm_in.buffer, shm_in.size, pTemplate, attrCount);
 	if (res != SKR_OK) {
-		printf("pack_attrs failed with code 0x%x\n", res);
+		print_error("pack_attrs failed with code 0x%x\n", res);
 		ret = res;
 		goto fail3;
 	}
@@ -385,7 +407,7 @@ SK_RET_CODE SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
 
 	res = TEEC_AllocateSharedMemory(&ctx, &shm_out);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto fail3;
 	}
@@ -400,15 +422,15 @@ SK_RET_CODE SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
 	op.params[1].memref.offset = 0;
 	op.params[1].memref.size = shm_out.size;
 
-	printf("Invoking TEE_FIND_OBJECTS\n");
+	print_info("Invoking TEE_FIND_OBJECTS\n");
 	res = TEEC_InvokeCommand(&sess, TEE_FIND_OBJECTS, &op,
 				 &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		print_error("TEEC_InvokeCommand failed with code 0x%x", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail4;
 	}
-
+	print_info("TEE_FIND_OBJECTS successful\n");
 	*pulObjectCount = op.params[2].value.a;
 
 	memcpy(phObject, shm_out.buffer,
@@ -443,7 +465,7 @@ SK_RET_CODE SK_GetObjectAttribute(SK_OBJECT_HANDLE hObject,
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		print_error("TEEC_InitializeContext failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto end;
 	}
@@ -451,7 +473,7 @@ SK_RET_CODE SK_GetObjectAttribute(SK_OBJECT_HANDLE hObject,
 	res = TEEC_OpenSession(&ctx, &sess, &uuid,
 			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		print_error("TEEC_Opensession failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail1;
 	}
@@ -461,14 +483,14 @@ SK_RET_CODE SK_GetObjectAttribute(SK_OBJECT_HANDLE hObject,
 
 	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_AllocateSharedMemory failed with code 0x%x", res);
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto fail2;
 	}
 
 	res = pack_attrs(shm_in.buffer, shm_in.size, attribute, attrCount);
 	if (res != SKR_OK) {
-		printf("pack_attrs failed with code 0x%x", res);
+		print_error("pack_attrs failed with code 0x%x", res);
 		ret = res;
 		goto fail3;
 	}
@@ -481,13 +503,15 @@ SK_RET_CODE SK_GetObjectAttribute(SK_OBJECT_HANDLE hObject,
 	op.params[1].memref.offset = 0;
 	op.params[1].memref.size = shm_in.size;
 
+	print_info("Invoking TEE_GET_OBJ_ATTRIBUTES\n");
 	res = TEEC_InvokeCommand(&sess, TEE_GET_OBJ_ATTRIBUTES, &op,
 				 &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		print_error("TEEC_InvokeCommand failed with code 0x%x", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail3;
 	}
+	print_info("TEE_GET_OBJ_ATTRIBUTES successful\n");
 
 	unpack_sk_attrs((void *)shm_in.buffer, shm_in.size, attribute,
 			&attrCount);
@@ -526,7 +550,7 @@ SK_RET_CODE SK_Sign(SK_MECHANISM_INFO *pMechanismType,
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		print_error("TEEC_InitializeContext failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto end;
 	}
@@ -534,7 +558,7 @@ SK_RET_CODE SK_Sign(SK_MECHANISM_INFO *pMechanismType,
 	res = TEEC_OpenSession(&ctx, &sess, &uuid,
 			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		print_error("TEEC_Opensession failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail1;
 	}
@@ -544,7 +568,7 @@ SK_RET_CODE SK_Sign(SK_MECHANISM_INFO *pMechanismType,
 
 	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto fail2;
 	}
@@ -556,7 +580,7 @@ SK_RET_CODE SK_Sign(SK_MECHANISM_INFO *pMechanismType,
 
 	res = TEEC_AllocateSharedMemory(&ctx, &shm_out);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto fail3;
 	}
@@ -573,15 +597,15 @@ SK_RET_CODE SK_Sign(SK_MECHANISM_INFO *pMechanismType,
 	op.params[2].memref.offset = 0;
 	op.params[2].memref.size = shm_out.size;
 
-	printf("Invoking TEE_SIGN_DIGEST\n");
+	print_info("Invoking TEE_SIGN_DIGEST\n");
 	res = TEEC_InvokeCommand(&sess, TEE_SIGN_DIGEST, &op,
 				 &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		print_error("TEEC_InvokeCommand failed with code 0x%x", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail4;
 	}
-
+	print_info("TEE_SIGN_DIGEST successful\n");
 	*outSignatureLen = op.params[2].memref.size;
 
 	if (outSignature)
@@ -619,7 +643,7 @@ SK_RET_CODE SK_Decrypt(SK_MECHANISM_INFO *pMechanismType,
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InitializeContext failed with code 0x%x\n", res);
+		print_error("TEEC_InitializeContext failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto end;
 	}
@@ -627,7 +651,7 @@ SK_RET_CODE SK_Decrypt(SK_MECHANISM_INFO *pMechanismType,
 	res = TEEC_OpenSession(&ctx, &sess, &uuid,
 			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_Opensession failed with code 0x%x\n", res);
+		print_error("TEEC_Opensession failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail1;
 	}
@@ -637,7 +661,7 @@ SK_RET_CODE SK_Decrypt(SK_MECHANISM_INFO *pMechanismType,
 
 	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto fail2;
 	}
@@ -649,7 +673,7 @@ SK_RET_CODE SK_Decrypt(SK_MECHANISM_INFO *pMechanismType,
 
 	res = TEEC_AllocateSharedMemory(&ctx, &shm_out);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
 		ret = map_teec_err_to_sk(res, 0);
 		goto fail3;
 	}
@@ -666,14 +690,15 @@ SK_RET_CODE SK_Decrypt(SK_MECHANISM_INFO *pMechanismType,
 	op.params[2].memref.offset = 0;
 	op.params[2].memref.size = shm_out.size;
 
-	printf("Invoking TEE_DECRYPT_DATA\n");
+	print_info("Invoking TEE_DECRYPT_DATA\n");
 	res = TEEC_InvokeCommand(&sess, TEE_DECRYPT_DATA, &op,
 				 &err_origin);
 	if (res != TEEC_SUCCESS) {
-		printf("TEEC_InvokeCommand failed with code 0x%x", res);
+		print_error("TEEC_InvokeCommand failed with code 0x%x", res);
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail4;
 	}
+	print_info("TEE_DECRYPT_DATA successful\n");
 
 	*outDataLen = op.params[2].memref.size;
 
