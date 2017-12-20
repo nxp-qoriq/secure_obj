@@ -13,7 +13,12 @@
  */
 TEE_Result TA_CreateEntryPoint(void)
 {
-	return TEE_SUCCESS;
+	uint32_t ret = TEE_SUCCESS;
+
+	/* Try to open db object, if not present create new db object */
+	ret = TA_OpenDatabase();
+
+	return ret;
 }
 
 /*
@@ -36,8 +41,6 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t param_types,
 						   TEE_PARAM_TYPE_NONE,
 						   TEE_PARAM_TYPE_NONE,
 						   TEE_PARAM_TYPE_NONE);
-	uint32_t ret = TEE_SUCCESS;
-
 	if (param_types != exp_param_types)
 		return TEE_ERROR_BAD_PARAMETERS;
 
@@ -45,9 +48,7 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t param_types,
 	(void)&params;
 	(void)&sess_ctx;
 
-	ret = TA_OpenDatabase();
-
-	return ret;
+	return TEE_SUCCESS;
 }
 
 /*

@@ -154,7 +154,7 @@ static TEE_Result TA_FindAttrMatchObjects(SK_ATTRIBUTE *attrs,
 
 		DMSG("obj_id_len: %d!\n", obj_id_len);
 		/* Skip database object type */
-		if (obj_id_len != sizeof(uint32_t))
+		if (obj_id_len == get_obj_db_id_size())
 			continue;
 
 		/* Check for object match with attributes */
@@ -187,6 +187,13 @@ out:
 	return res;
 }
 
+/*
+ * Input params:
+ * param#0 : input serialized attributes template used for find
+ * param#1 : output object IDs buffer
+ * param#2 : output object IDs count
+ * param#3 : not used
+ */
 TEE_Result TA_FindObjects(uint32_t param_types, TEE_Param params[4])
 {
 	TEE_Result res;

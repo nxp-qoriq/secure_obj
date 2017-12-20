@@ -80,3 +80,8 @@ out:
 
 	return ret;
 }
+
+uint32_t get_obj_db_id_size(void)
+{
+	return sizeof(db_obj_id);
+}

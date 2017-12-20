@@ -6,6 +6,7 @@
 /* Database API's declaration */
 TEE_Result TA_OpenDatabase(void);
 TEE_Result TA_GetNextObjectID(uint32_t *next_obj_id);
+uint32_t get_obj_db_id_size(void);
 
 /* Create Object API */
 TEE_Result TA_CreateObject(uint32_t param_types, TEE_Param params[4]);

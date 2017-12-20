@@ -4,6 +4,13 @@
 #include "string.h"
 #include "secure_storage_common.h"
 
+/*
+ * Input params:
+ * param#0 : object ID to be erased
+ * param#1 : not used
+ * param#2 : not used
+ * param#3 : not used
+ */
 TEE_Result TA_EraseObject(uint32_t param_types, TEE_Param params[4])
 {
 	TEE_Result res = TEE_SUCCESS;
@@ -37,6 +44,13 @@ out:
 	return res;
 }
 
+/*
+ * Input params:
+ * param#0 : object ID
+ * param#1 : inout serialized attributes buffer to be filled
+ * param#2 : not used
+ * param#3 : not used
+ */
 TEE_Result TA_GetObjectAttributes(uint32_t param_types, TEE_Param params[4])
 {
 	TEE_Result res, res_attr = TEE_SUCCESS;
@@ -108,6 +122,11 @@ TEE_Result TA_GetObjectAttributes(uint32_t param_types, TEE_Param params[4])
 			res_attr = TEE_ERROR_BAD_PARAMETERS;
 			continue;
 		}
+		/*
+		 * In case no buffer is passed for the attribute and
+		 * attribute is found, valelen would be filled with
+		 * the length of buffer required for value.
+		 */
 		if (attrs[n].value == NULL) {
 			attrs[n].valueLen = match_attr->valueLen;
 			continue;

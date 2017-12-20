@@ -99,6 +99,13 @@ static TEE_Result TA_GetTEEObjectTypeAndAttr(SK_ATTRIBUTE *attrs,
 	return TEE_SUCCESS;
 }
 
+/*
+ * Input params:
+ * param#0 : input serialized object attributes buffer
+ * param#1 : output object ID
+ * param#2 : not used
+ * param#3 : not used
+ */
 TEE_Result TA_CreateObject(uint32_t param_types, TEE_Param params[4])
 {
 	TEE_Result res;
@@ -141,6 +148,13 @@ TEE_Result TA_CreateObject(uint32_t param_types, TEE_Param params[4])
 	if (res != TEE_SUCCESS)
 		goto out;
 
+	/*
+	 * Pack SK attributes in data stream of object as follows:
+	 * - First 32 bit of buffer -> No of SK attributes.
+	 * - Then SK attibute structure array.
+	 * - Then SK attributes value buffers whose pointers are
+	 *   there in SK attribute structure array.
+	 */
 	DMSG("Pack SK attributes!\n");
 	res = pack_sk_attrs(attrs, attr_count, &data, &data_len);
 	if (res != TEE_SUCCESS)
