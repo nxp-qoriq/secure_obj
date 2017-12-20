@@ -38,7 +38,7 @@ void populate_attrs(SK_ATTRIBUTE *attrs)
 	attrs[2].type = SK_ATTR_KEY_TYPE;
 	attrs[2].value = &key;
 	attrs[2].valueLen = sizeof(key);
-	attrs[3].type = SK_ATTR_LABEL;
+	attrs[3].type = SK_ATTR_OBJECT_LABEL;
 	attrs[3].value = label;
 	attrs[3].valueLen = sizeof(label);
 	attrs[4].type = SK_ATTR_MODULUS_BITS;
@@ -360,7 +360,7 @@ int main(int argc, char *argv[])
 	memset(attrs, 0, sizeof(attrs));
 
 	attrs[0].type = SK_ATTR_OBJECT_TYPE;
-	attrs[1].type = SK_ATTR_LABEL;
+	attrs[1].type = SK_ATTR_OBJECT_LABEL;
 	attrs[2].type = SK_ATTR_MODULUS;
 
 	shm_in.size = get_attr_size(attrs, 3);

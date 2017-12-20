@@ -35,7 +35,7 @@ TEE_Result pack_sk_attrs(const SK_ATTRIBUTE *attrs, uint32_t attr_count,
 		case SK_ATTR_OBJECT_TYPE:
 		case SK_ATTR_OBJECT_INDEX:
 		case SK_ATTR_KEY_TYPE:
-		case SK_ATTR_LABEL:
+		case SK_ATTR_OBJECT_LABEL:
 		case SK_ATTR_MODULUS_BITS:
 		case SK_ATTR_MODULUS:
 		case SK_ATTR_PUBLIC_EXPONENT:
@@ -68,7 +68,7 @@ TEE_Result pack_sk_attrs(const SK_ATTRIBUTE *attrs, uint32_t attr_count,
 		case SK_ATTR_OBJECT_TYPE:
 		case SK_ATTR_OBJECT_INDEX:
 		case SK_ATTR_KEY_TYPE:
-		case SK_ATTR_LABEL:
+		case SK_ATTR_OBJECT_LABEL:
 		case SK_ATTR_MODULUS_BITS:
 		case SK_ATTR_MODULUS:
 		case SK_ATTR_PUBLIC_EXPONENT:

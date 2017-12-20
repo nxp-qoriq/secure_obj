@@ -18,7 +18,7 @@ static void populate_attrs(SK_ATTRIBUTE *attrs)
 	attrs[2].type = SK_ATTR_KEY_TYPE;
 	attrs[2].value = &key;
 	attrs[2].valueLen = sizeof(key);
-	attrs[3].type = SK_ATTR_LABEL;
+	attrs[3].type = SK_ATTR_OBJECT_LABEL;
 	attrs[3].value = label;
 	attrs[3].valueLen = sizeof(label);
 	attrs[4].type = SK_ATTR_MODULUS_BITS;
@@ -126,7 +126,7 @@ static void do_GetObjectAttributes(SK_OBJECT_HANDLE hObject)
 	/* Getting only RSA Keypair objects */
 	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * 2);
 
-	attrs[0].type = SK_ATTR_LABEL;
+	attrs[0].type = SK_ATTR_OBJECT_LABEL;
 	attrs[1].type = SK_ATTR_OBJECT_INDEX;
 
 	ret = SK_GetObjectAttribute(hObject, attrs, attrCount);

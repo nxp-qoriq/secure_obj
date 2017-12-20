@@ -77,7 +77,8 @@ typedef SK_TYPE SK_ATTRIBUTE_TYPE;
 
 #define SK_ATTR_OBJECT_TYPE		0 /* The object type (Mandatory in Create) */
 #define SK_ATTR_OBJECT_INDEX		1 /* The object index (Mandatory in Create) */
-#define SK_ATTR_LABEL			2 /* The object label (Mandatory in Create) */
+#define SK_ATTR_OBJECT_LABEL		2 /* The object label (Mandatory in Create) */
+#define SK_ATTR_OBJECT_VALUE		3 /*  Value of Object */
 #define SK_ATTR_KEY_TYPE		5 /* Key Type RSA/EC (Mandatory with key type objects) */
 
 /* Attributes For RSA Key Pair */
@@ -101,6 +102,13 @@ typedef struct SK_ATTRIBUTE{
 	uint16_t		valueLen;	/* The length in bytes of \p value. */
 } SK_ATTRIBUTE;
 
+
+/*
+  * A Context Handle - may point to any stucture.
+ */
+typedef void SK_CONTEXT_HANDLE;
+
+
 /*******************************************************************
  * Cryptographic Operations TBD
  *******************************************************************/
@@ -115,14 +123,24 @@ typedef SK_TYPE SK_MECHANISM_TYPE;
 /*******************************************************************
  * Mechanisms
  *******************************************************************/
-#define		SKM_RSAES_PKCS1_V1_5			20
-#define		SKM_RSA_PKCS_NOPAD			21
-#define		SKM_RSASSA_PKCS1_V1_5_MD5		22
-#define		SKM_RSASSA_PKCS1_V1_5_SHA1		23
-#define		SKM_RSASSA_PKCS1_V1_5_SHA224		24
-#define		SKM_RSASSA_PKCS1_V1_5_SHA256		25
-#define		SKM_RSASSA_PKCS1_V1_5_SHA384		26
-#define		SKM_RSASSA_PKCS1_V1_5_SHA512		27
+#define		SKM_RSAES_PKCS1_V1_5			101
+#define		SKM_RSAES_PKCS1_OAEP_MGF1_SHA1		102 /* Currently not supported */
+#define		SKM_RSAES_PKCS1_OAEP_MGF1_SHA224	103 /* Currently not supported */
+#define		SKM_RSAES_PKCS1_OAEP_MGF1_SHA256	104 /* Currently not supported */
+#define		SKM_RSAES_PKCS1_OAEP_MGF1_SHA384	105 /* Currently not supported */
+#define		SKM_RSAES_PKCS1_OAEP_MGF1_SHA512	106 /* Currently not supported */
+#define		SKM_RSA_PKCS_NOPAD			107
+#define		SKM_RSASSA_PKCS1_V1_5_MD5		111
+#define		SKM_RSASSA_PKCS1_V1_5_SHA1		112
+#define		SKM_RSASSA_PKCS1_V1_5_SHA224		113
+#define		SKM_RSASSA_PKCS1_V1_5_SHA256		114
+#define		SKM_RSASSA_PKCS1_V1_5_SHA384		115
+#define		SKM_RSASSA_PKCS1_V1_5_SHA512		116
+#define		SKM_RSASSA_PKCS1_PSS_MGF1_SHA1		117 /* Currently not supported */
+#define		SKM_RSASSA_PKCS1_PSS_MGF1_SHA224	118 /* Currently not supported */
+#define		SKM_RSASSA_PKCS1_PSS_MGF1_SHA256	119 /* Currently not supported */
+#define		SKM_RSASSA_PKCS1_PSS_MGF1_SHA384	120 /* Currently not supported */
+#define		SKM_RSASSA_PKCS1_PSS_MGF1_SHA512	121 /* Currently not supported */
 
 /*
  * Specifying the required information in order to use a mechanism,
