@@ -1,4 +1,7 @@
-
+/*
+  * Copyright 2017 NXP
+  * SPDX-License-Identifier:     BSD-3-Clause
+*/
 /*
  * Test data generated with
  * http://www.mobilefish.com/services/rsa_key_generation/rsa_key_generation.php

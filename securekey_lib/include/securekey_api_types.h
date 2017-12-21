@@ -1,4 +1,9 @@
 /*
+  * Copyright 2017 NXP
+  * SPDX-License-Identifier:     BSD-3-Clause
+*/
+
+/*
  * securekey_api_types.h
  */
 #ifndef _SECUREKEY_API_TYPES_H_
