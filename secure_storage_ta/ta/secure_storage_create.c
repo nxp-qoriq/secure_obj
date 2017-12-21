@@ -1,3 +1,8 @@
+/*
+  * Copyright 2017 NXP
+  * SPDX-License-Identifier:     BSD-3-Clause
+*/
+
 #include <tee_internal_api.h>
 #include <tee_internal_api_extensions.h>
 

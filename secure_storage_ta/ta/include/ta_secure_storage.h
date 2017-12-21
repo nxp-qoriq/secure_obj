@@ -1,3 +1,8 @@
+/*
+  * Copyright 2017 NXP
+  * SPDX-License-Identifier:     BSD-3-Clause
+*/
+
 #ifndef TA_SECURE_STORAGE_H
 #define TA_SECURE_STORAGE_H
 

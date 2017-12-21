@@ -1,3 +1,8 @@
+/*
+  * Copyright 2017 NXP
+  * SPDX-License-Identifier:     BSD-3-Clause
+*/
+
 #define STR_TRACE_USER_TA "SECURE_STORAGE"
 
 #include <tee_internal_api.h>

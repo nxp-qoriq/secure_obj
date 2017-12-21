@@ -1,3 +1,8 @@
+/*
+  * Copyright 2017 NXP
+  * SPDX-License-Identifier:     BSD-3-Clause
+*/
+
 #ifndef SECURE_STORAGE_COMMON_H
 #define SECURE_STORAGE_COMMON_H
 
