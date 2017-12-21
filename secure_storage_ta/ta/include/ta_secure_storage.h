@@ -17,5 +17,6 @@
 #define TEE_ERASE_OBJECT		0x4
 #define TEE_SIGN_DIGEST			0x5
 #define TEE_DECRYPT_DATA		0x6
+#define TEE_DIGEST_DATA			0x7
 
 #endif /*TA_SECURE_STORAGE_H*/

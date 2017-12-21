@@ -5,9 +5,92 @@
 
 #include <tee_internal_api.h>
 #include <tee_internal_api_extensions.h>
+#include <utee_defines.h>
 
 #include "string.h"
 #include "secure_storage_common.h"
+
+/*
+ * Input params:
+ * param#0 : SK Digest mechanism
+ * param#1 : the input data buffer
+ * param#2 : the output digest buffer
+ * param#3 : not used
+ */
+TEE_Result TA_DigestData(uint32_t param_types, TEE_Param params[4])
+{
+	TEE_Result res = TEE_SUCCESS;
+	TEE_OperationHandle operation = TEE_HANDLE_NULL;
+	uint32_t algorithm, digest_size = 0;
+	uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+						   TEE_PARAM_TYPE_MEMREF_INPUT,
+						   TEE_PARAM_TYPE_MEMREF_OUTPUT,
+						   TEE_PARAM_TYPE_NONE);
+	if (param_types != exp_param_types) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto out;
+	}
+
+	switch (params[0].value.a) {
+	case SKM_MD5:
+		algorithm = TEE_ALG_MD5;
+		digest_size = TEE_MD5_HASH_SIZE;
+		break;
+	case SKM_SHA1:
+		algorithm = TEE_ALG_SHA1;
+		digest_size = TEE_SHA1_HASH_SIZE;
+		break;
+	case SKM_SHA224:
+		algorithm = TEE_ALG_SHA224;
+		digest_size = TEE_SHA224_HASH_SIZE;
+		break;
+	case SKM_SHA256:
+		algorithm = TEE_ALG_SHA256;
+		digest_size = TEE_SHA256_HASH_SIZE;
+		break;
+	case SKM_SHA384:
+		algorithm = TEE_ALG_SHA384;
+		digest_size = TEE_SHA384_HASH_SIZE;
+		break;
+	case SKM_SHA512:
+		algorithm = TEE_ALG_SHA512;
+		digest_size = TEE_SHA512_HASH_SIZE;
+		break;
+	default:
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto out;
+	}
+
+	/* Check for output digest buffer */
+	if (params[2].memref.buffer == NULL) {
+		params[2].memref.size = digest_size;
+		res = TEE_SUCCESS;
+		goto out;
+	} else if (params[2].memref.size < digest_size) {
+		res = TEE_ERROR_SHORT_BUFFER;
+		goto out;
+	}
+
+	DMSG("Allocate Operation!\n");
+	res = TEE_AllocateOperation(&operation, algorithm, TEE_MODE_DIGEST, 0);
+	if (res != TEE_SUCCESS)
+		goto out;
+
+	DMSG("Generate digest for input data!\n");
+	res = TEE_DigestDoFinal(operation, params[1].memref.buffer,
+				params[1].memref.size, params[2].memref.buffer,
+				&params[2].memref.size);
+
+	if (res != TEE_SUCCESS)
+		goto out;
+
+	DMSG("Digest Successful!\n");
+out:
+	if (operation)
+		TEE_FreeOperation(operation);
+
+	return res;
+}
 
 /*
  * Input params:

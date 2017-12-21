@@ -25,6 +25,9 @@ TEE_Result TA_FindObjects(uint32_t param_types, TEE_Param params[4]);
 /* Get Attribute Object API */
 TEE_Result TA_GetObjectAttributes(uint32_t param_types, TEE_Param params[4]);
 
+/* Generate Digest API */
+TEE_Result TA_DigestData(uint32_t param_types, TEE_Param params[4]);
+
 /* Sign Digest API */
 TEE_Result TA_SignDigest(uint32_t param_types, TEE_Param params[4]);
 
