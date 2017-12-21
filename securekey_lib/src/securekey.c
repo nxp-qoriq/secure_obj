@@ -721,6 +721,100 @@ end:
 	return ret;
 }
 
+SK_RET_CODE SK_Digest(SK_MECHANISM_INFO *pMechanismType, const uint8_t *inData,
+		      uint16_t inDataLen, uint8_t *outDigest,
+		      uint16_t *outDigestLen)
+{
+	TEEC_Result res;
+	TEEC_Context ctx;
+	TEEC_Session sess;
+	TEEC_Operation op;
+	TEEC_UUID uuid = TA_SECURE_STORAGE_UUID;
+	TEEC_SharedMemory shm_in, shm_out;
+	uint32_t err_origin;
+	SK_RET_CODE ret = SKR_OK;
+
+	if ((pMechanismType == NULL) || (inData == NULL) ||
+	    (inDataLen == 0) || ((outDigest == NULL) &&
+				 (*outDigestLen != 0))) {
+		ret = SKR_ERR_BAD_PARAMETERS;
+		goto end;
+	}
+	/* Initialize a context connecting us to the TEE */
+	res = TEEC_InitializeContext(NULL, &ctx);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_InitializeContext failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto end;
+	}
+
+	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_Opensession failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail1;
+	}
+
+	shm_in.size = inDataLen;
+	shm_in.flags = TEEC_MEM_INPUT;
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm_in);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail2;
+	}
+
+	memcpy(shm_in.buffer, inData, shm_in.size);
+
+	shm_out.size = *outDigestLen;
+	shm_out.flags = TEEC_MEM_OUTPUT;
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm_out);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail3;
+	}
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_MEMREF_WHOLE,
+					 TEEC_MEMREF_WHOLE, TEEC_NONE);
+	op.params[0].value.a = pMechanismType->mechanism;
+	op.params[1].memref.parent = &shm_in;
+	op.params[1].memref.offset = 0;
+	op.params[1].memref.size = shm_in.size;
+	op.params[2].memref.parent = &shm_out;
+	op.params[2].memref.offset = 0;
+	op.params[2].memref.size = shm_out.size;
+
+	print_info("Invoking TEE_DIGEST_DATA\n");
+	res = TEEC_InvokeCommand(&sess, TEE_DIGEST_DATA, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_InvokeCommand failed with code 0x%x", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail4;
+	}
+	print_info("TEE_DIGEST_DATA successful\n");
+
+	*outDigestLen = op.params[2].memref.size;
+
+	if (outDigest)
+		memcpy(outDigest, shm_out.buffer, *outDigestLen);
+fail4:
+	TEEC_ReleaseSharedMemory(&shm_out);
+fail3:
+	TEEC_ReleaseSharedMemory(&shm_in);
+fail2:
+	TEEC_CloseSession(&sess);
+fail1:
+	TEEC_FinalizeContext(&ctx);
+end:
+	return ret;
+}
+
 static SK_FUNCTION_LIST global_function_list;
 
 SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
@@ -732,6 +826,7 @@ SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
 	global_function_list.SK_GetObjectAttribute = SK_GetObjectAttribute;
 	global_function_list.SK_Sign = SK_Sign;
 	global_function_list.SK_Decrypt = SK_Decrypt;
+	global_function_list.SK_Digest = SK_Digest;
 
 	*ppFuncList = &global_function_list;
 

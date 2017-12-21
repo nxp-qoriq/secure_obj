@@ -146,6 +146,12 @@ typedef SK_TYPE SK_MECHANISM_TYPE;
 #define		SKM_RSASSA_PKCS1_PSS_MGF1_SHA256	119 /* Currently not supported */
 #define		SKM_RSASSA_PKCS1_PSS_MGF1_SHA384	120 /* Currently not supported */
 #define		SKM_RSASSA_PKCS1_PSS_MGF1_SHA512	121 /* Currently not supported */
+#define		SKM_MD5					131
+#define		SKM_SHA1				132
+#define		SKM_SHA224				133
+#define		SKM_SHA256				134
+#define		SKM_SHA384				135
+#define		SKM_SHA512				136
 
 /*
  * Specifying the required information in order to use a mechanism,

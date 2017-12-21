@@ -219,6 +219,37 @@ static void do_Decrypt(SK_OBJECT_HANDLE hObject)
 	free(decData);
 }
 
+static void do_Digest(void)
+{
+	int ret, n = 0;
+	SK_MECHANISM_INFO mechanismType = {0};
+	char message[] = "Hello PKCS api";
+	uint8_t *digest = NULL;
+	uint16_t digestLen = 0;
+
+	mechanismType.mechanism = SKM_SHA256;
+
+	ret = SK_Digest(&mechanismType, message, sizeof(message),
+			digest, &digestLen);
+	if (ret != SKR_OK)
+		printf("SK_Digest1 failed with code = 0x%x\n", ret);
+
+	digest = (uint8_t *)malloc(digestLen);
+
+	ret = SK_Digest(&mechanismType, message, sizeof(message),
+			digest, &digestLen);
+	if (ret != SKR_OK)
+		printf("SK_Digest2 failed with code = 0x%x\n", ret);
+
+	printf("SK_Digest successful\n");
+	printf("Digest:\n 0x");
+	for (n = 0; n < digestLen; n++)
+		printf("%x", *(digest + n));
+	printf("\n");
+
+	free(digest);
+}
+
 int main(int argc, char *argv[])
 {
 	SK_OBJECT_HANDLE obj1;
@@ -231,6 +262,7 @@ int main(int argc, char *argv[])
 	do_EnumerateObject();
 	do_Sign(obj1);
 	do_Decrypt(obj1);
+	do_Digest();
 	do_EraseObject(obj1);
 	do_EnumerateObject();
 	return 0;

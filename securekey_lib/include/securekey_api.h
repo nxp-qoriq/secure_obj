@@ -31,6 +31,9 @@ struct SK_FUNCTION_LIST {
 			SK_OBJECT_HANDLE hObject, const uint8_t *inData,
 			uint16_t inDataLen,	uint8_t *outData,
 			uint16_t *outDataLen);
+	SK_RET_CODE(*SK_Digest)(SK_MECHANISM_INFO *pMechanismType,
+			const uint8_t *inData, uint16_t inDataLen,
+			uint8_t *outDigest, uint16_t *outDigestLen);
 };
 
 typedef struct SK_FUNCTION_LIST SK_FUNCTION_LIST;
@@ -226,7 +229,6 @@ SK_RET_CODE	SK_Sign(SK_MECHANISM_INFO *pMechanismType,
 		uint16_t inDigestLen, uint8_t *outSignature,
 		uint16_t *outSignatureLen);
 
-
 /**
 * Dncrypts the data provided using the Object key and the requested
 mechanism.
@@ -272,5 +274,46 @@ SK_RET_CODE	SK_Decrypt(SK_MECHANISM_INFO *pMechanismType,
 		SK_OBJECT_HANDLE hObject, const uint8_t *inData,
 		uint16_t inDataLen, uint8_t *outData,
 		uint16_t *outDataLen);
+
+/**
+* Calculates the Digest (e.g. Sha256) value of the data provided as input.
+
+The Cryptographic Mechanism to be used is passed in the \p type member of
+the \p pMechanismType parameter.
+
+If additional information is required by the specific digest mechanism, is
+will be conveyed in \p pMechanismType->pParameter.
+
+If \p outDigest is NULL, then all that the function does is return (in \p *outDigestLen)
+a number of bytes which would suffice to hold the digest value.  SKR_OK
+is returned by the function.
+
+If \p outDigest is not NULL, then \p *outDigestLen must contain the number
+of bytes in the buffer \p outDigest.  If that buffer is large enough to hold the
+digest value be returned, then the data is copied to \p outDigest, and SKR_OK
+is returned by the function.
+If the buffer is not large enough, then SKR_ERR_SHORT_BUFFER is returned. In either
+case, \p *outDigestLen is set to hold the exact number of bytes to be returned.
+
+* \param[in] pMechanismType The Digest Cryptographic Mechanism to be used
+* \param[in] inData    Data buffer for which the digest must be calculated
+* \param[in] inDataLen The length of data passed as argument
+* \param[in,out] outDigest    IN: caller passes a buffer to hold the digest value;
+OUT: contains the calculated digest
+* \param[in,out] outDigestLen IN: length of the \p outDigest buffer passed;
+OUT: the number of bytes returned in \p outDigest
+*
+* \retval ::SKR_OK Successful execution
+* \retval ::SKR_ERR_BAD_PARAMETERS      Invalid function arguments
+* \retval ::SKR_ERR_OUT_OF_MEMORY	Memory allocation failed.
+* \retval ::SKR_ERR_SHORT_BUFFER	Short output buffer.
+currently inaccessible.
+* -- Some internal error codes other than mentioned above can also be
+returned.
+* Refer to securekey_api_types.h for error code description.
+*/
+SK_RET_CODE	SK_Digest(SK_MECHANISM_INFO *pMechanismType,
+		const uint8_t *inData, uint16_t inDataLen, uint8_t *outDigest,
+		uint16_t *outDigestLen);
 
 #endif /* _SECUREKEY_API_H_*/
