@@ -91,6 +91,8 @@ TEE_Result TA_InvokeCommandEntryPoint(void *sess_ctx, uint32_t cmd_id,
 		return TA_DecryptData(param_types, params);
 	case TEE_DIGEST_DATA:
 		return TA_DigestData(param_types, params);
+	case TEE_GENERATE_KEYPAIR:
+		return TA_GenerateKeyPair(param_types, params);
 	default:
 		return TEE_ERROR_BAD_PARAMETERS;
 	}

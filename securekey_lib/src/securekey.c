@@ -242,8 +242,10 @@ SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
 	uint32_t err_origin;
 	SK_RET_CODE ret = SKR_OK;
 
-	if (attr == NULL || attrCount <= 0 || phObject == NULL)
+	if (attr == NULL || attrCount <= 0 || phObject == NULL) {
 		ret = SKR_ERR_BAD_PARAMETERS;
+		goto end;
+	}
 
 	/* Initialize a context connecting us to the TEE */
 	res = TEEC_InitializeContext(NULL, &ctx);
@@ -296,6 +298,88 @@ SK_RET_CODE SK_CreateObject(SK_ATTRIBUTE *attr,
 	*phObject = op.params[1].value.a;
 
 	print_info("TEE_CREATE_OBJECT successful\n");
+
+fail3:
+	TEEC_ReleaseSharedMemory(&shm);
+fail2:
+	TEEC_CloseSession(&sess);
+fail1:
+	TEEC_FinalizeContext(&ctx);
+end:
+	return ret;
+}
+
+SK_RET_CODE SK_GenerateKeyPair(SK_MECHANISM_INFO *pMechanism,
+			       SK_ATTRIBUTE *attr, uint16_t attrCount,
+			       SK_OBJECT_HANDLE *phKey)
+{
+	TEEC_Result res;
+	TEEC_Context ctx;
+	TEEC_Session sess;
+	TEEC_Operation op;
+	TEEC_UUID uuid = TA_SECURE_STORAGE_UUID;
+	TEEC_SharedMemory shm;
+	uint32_t err_origin;
+	SK_RET_CODE ret = SKR_OK;
+
+	if ((pMechanism == NULL) || (attr == NULL) || (attrCount <= 0) ||
+	    (phKey == NULL)) {
+		ret = SKR_ERR_BAD_PARAMETERS;
+		goto end;
+	}
+
+	/* Initialize a context connecting us to the TEE */
+	res = TEEC_InitializeContext(NULL, &ctx);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_InitializeContext failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto end;
+	}
+
+	res = TEEC_OpenSession(&ctx, &sess, &uuid,
+			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_Opensession failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail1;
+	}
+
+	shm.size = get_attr_size(attr, attrCount);
+	shm.flags = TEEC_MEM_INPUT;
+
+	res = TEEC_AllocateSharedMemory(&ctx, &shm);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail2;
+	}
+
+	res = pack_attrs(shm.buffer, shm.size, attr, attrCount);
+	if (res != SKR_OK) {
+		print_error("pack_attrs failed with code 0x%x\n", res);
+		ret = res;
+		goto fail3;
+	}
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_MEMREF_WHOLE,
+					 TEEC_VALUE_OUTPUT, TEEC_NONE);
+	op.params[0].value.a = pMechanism->mechanism;
+	op.params[1].memref.parent = &shm;
+	op.params[1].memref.offset = 0;
+	op.params[1].memref.size = shm.size;
+
+	print_info("Invoking TEE_GENERATE_KEYPAIR\n");
+	res = TEEC_InvokeCommand(&sess, TEE_GENERATE_KEYPAIR, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_InvokeCommand failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail3;
+	}
+	*phKey = op.params[2].value.a;
+
+	print_info("TEE_GENERATE_KEYPAIR successful\n");
 
 fail3:
 	TEEC_ReleaseSharedMemory(&shm);

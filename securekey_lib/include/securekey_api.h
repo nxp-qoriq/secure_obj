@@ -82,16 +82,15 @@ asking for.
 * \param[out] pulObjectCount OUT: set to hold the exact number of handles
 in objectHandles.
 *
-* ---------------------------------------TBD-------------------------------------
-* Some more error codes other than mentioned below can be returned.
-* Work in progress for that.
 * \retval ::SKR_OK			Successful execution, phObject
 will be filled with created object handle.
 * \retval ::SKR_ERR_BAD_PARAMETERS	Invalid function arguments
 * \retval ::SKR_ERR_OUT_OF_MEMORY	Memory allocation failed.
 * \retval ::SKR_ERR_NOT_SUPPORTED	The function and/or
 parameters are not supported by the library.
-* ---------------------------------------TBD-------------------------------------
+* -- Some internal error codes other than mentioned above can also be
+returned.
+* Refer to securekey_api_types.h for error code description.
 */
 SK_RET_CODE	SK_EnumerateObjects(SK_ATTRIBUTE *pTemplate,
 		uint32_t attrCount, SK_OBJECT_HANDLE *phObject,
@@ -127,6 +126,40 @@ returned.
 */
 SK_RET_CODE	SK_CreateObject(SK_ATTRIBUTE *attr,
 		uint16_t attrCount, SK_OBJECT_HANDLE *phObject);
+
+/**
+* Generates key pair on the HSM, and returns a handle to it.
+
+If the object already exists, it depends on the HSM behavior whether
+this function succeeds (e.g. set a new value) or fail with an error.
+
+\p pMechanism is mechanism for key pair generation. Eg:
+SKM_RSA_PKCS_KEY_PAIR_GEN.
+\p attr is an array of attributes that the object should be created
+with. Some of the attributes may be mandatory, such as
+SK_ATTR_OBJECT_INDEX (the id of the object), and some are optional.
+Application needs to take care that valid attributes are passed, library will not
+return any error on receving inconsistent/incompatible attributes.
+
+* \param[in] pMechanism Mechanism for key pair generation
+* \param[in] attr The array of attributes to be used in creating the Object
+* \param[in] attrCount The number of attributes in \p attr
+* \param[in, out] phKey IN: A pointer to a handle (must not be NULL);
+OUT: The handle of the created Object
+*
+* \retval ::SKR_OK			Successful execution, phObject
+will be filled with created object handle.
+* \retval ::SKR_ERR_BAD_PARAMETERS	Invalid function arguments
+* \retval ::SKR_ERR_OUT_OF_MEMORY	Memory allocation failed.
+* \retval ::SKR_ERR_NOT_SUPPORTED	The function and/or
+parameters are not supported by the library.
+* -- Some internal error codes other than mentioned above can also be
+returned.
+* Refer to securekey_api_types.h for error code description.
+*/
+SK_RET_CODE	SK_GenerateKeyPair(SK_MECHANISM_INFO *pMechanism,
+		SK_ATTRIBUTE *attr, uint16_t attrCount,
+		SK_OBJECT_HANDLE *phKey);
 
 /**
 * Erases an object from the HSM.

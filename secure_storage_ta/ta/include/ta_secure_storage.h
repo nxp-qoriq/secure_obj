@@ -18,5 +18,6 @@
 #define TEE_SIGN_DIGEST			0x5
 #define TEE_DECRYPT_DATA		0x6
 #define TEE_DIGEST_DATA			0x7
+#define TEE_GENERATE_KEYPAIR		0x8
 
 #endif /*TA_SECURE_STORAGE_H*/

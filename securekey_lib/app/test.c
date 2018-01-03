@@ -79,6 +79,37 @@ static SK_OBJECT_HANDLE do_CreateObject(void)
 	return hObject;
 }
 
+static SK_OBJECT_HANDLE do_GenerateKeyPair(void)
+{
+	int ret;
+	SK_ATTRIBUTE attrs[4];
+	SK_OBJECT_HANDLE hObject;
+	SK_MECHANISM_INFO mechanismType = {0};
+
+	mechanismType.mechanism = SKM_RSA_PKCS_KEY_PAIR_GEN;
+
+	attrs[0].type = SK_ATTR_OBJECT_INDEX;
+	attrs[0].value = &obj_id;
+	attrs[0].valueLen = sizeof(obj_id);
+	attrs[1].type = SK_ATTR_OBJECT_LABEL;
+	attrs[1].value = label;
+	attrs[1].valueLen = sizeof(label);
+	attrs[2].type = SK_ATTR_MODULUS_BITS;
+	attrs[2].value = &key_len;
+	attrs[2].valueLen = sizeof(key_len);
+	attrs[3].type = SK_ATTR_PUBLIC_EXPONENT;
+	attrs[3].value = (void *)rsa_pub_exp;
+	attrs[3].valueLen = sizeof(rsa_pub_exp);
+
+	ret = SK_GenerateKeyPair(&mechanismType, attrs, 4, &hObject);
+	if (ret != SKR_OK)
+		printf("SK_GenerateKeyPair failed wit err code = 0x%x\n", ret);
+	else
+		printf("SK_GenerateKeyPair successful handle = 0x%x\n", hObject);
+
+	return hObject;
+}
+
 static void do_EraseObject(SK_OBJECT_HANDLE hObject)
 {
 	int ret, i = 0;
@@ -252,18 +283,31 @@ static void do_Digest(void)
 
 int main(int argc, char *argv[])
 {
-	SK_OBJECT_HANDLE obj1;
+	SK_OBJECT_HANDLE obj1, obj2;
 
 	obj1 = do_CreateObject();
 	if (obj1 == SKR_ERR_OBJECT_HANDLE_INVALID)
 		return -1;
 
-	do_GetObjectAttributes(obj1);
+	obj2 = do_GenerateKeyPair();
+	if (obj1 == SKR_ERR_OBJECT_HANDLE_INVALID)
+		return -1;
+
 	do_EnumerateObject();
+	do_Digest();
+
+	/* Operations with imported object */
+	do_GetObjectAttributes(obj1);
 	do_Sign(obj1);
 	do_Decrypt(obj1);
-	do_Digest();
+
+	/* Operations with generated object */
+	do_GetObjectAttributes(obj2);
+	do_Sign(obj2);
+	do_Decrypt(obj2);
+
 	do_EraseObject(obj1);
-	do_EnumerateObject();
+	do_EraseObject(obj2);
+
 	return 0;
 }
