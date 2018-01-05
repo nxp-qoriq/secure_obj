@@ -286,12 +286,7 @@ int main(int argc, char *argv[])
 	SK_OBJECT_HANDLE obj1, obj2;
 
 	obj1 = do_CreateObject();
-	if (obj1 == SKR_ERR_OBJECT_HANDLE_INVALID)
-		return -1;
-
 	obj2 = do_GenerateKeyPair();
-	if (obj1 == SKR_ERR_OBJECT_HANDLE_INVALID)
-		return -1;
 
 	do_EnumerateObject();
 	do_Digest();
