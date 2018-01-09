@@ -14,7 +14,7 @@ make;
 cd -;
 echo ""
 
-echo "Building SecureKey";
+echo "Building Secure Object Library";
 cd securekey_lib;
 make clean;
 make;
@@ -22,7 +22,7 @@ cd -;
 
 mkdir images;
 cp secure_storage_ta/ta/b05bcf48-9732-4efa-a9e0-141c7c888c34.ta images;
-cp securekey_lib/out/export/lib/libsecurekey.so images;
+cp securekey_lib/out/export/lib/libsecure_obj.so images;
 cp securekey_lib/out/export/app/* images;
 else
 echo "Cleaning TA and Lib"

@@ -20,8 +20,8 @@ OUT_DIR ?= $(O)/securekey_lib
 
 all: securekey_lib securekey_static_lib install sobj_app
 
-LIB_NAME	:= libsecurekey.so
-STATIC_LIB_NAME        := libsecurekey.a
+LIB_NAME	:= libsecure_obj.so
+STATIC_LIB_NAME        := libsecure_obj.a
 
 SECUREKEY_SRCS	:= securekey.c
 
@@ -62,18 +62,18 @@ sobj_app:
 	$(VPREFIX)$(CC) -I$(OPENSSL_PATH)/include -Iinclude/ \
 	-o app/utils.o app/utils.c \
 	-o app/sobj_app app/sobj_app.c \
-	-lsecurekey -Lout/securekey_lib/ $(SECUREKEY_LFLAGS) -L$(OPENSSL_PATH) -lssl -lcrypto
+	-lsecure_obj -Lout/securekey_lib/ $(SECUREKEY_LFLAGS) -L$(OPENSSL_PATH) -lssl -lcrypto
 	mv app/sobj_app ${EXPORT_DIR}/app
 
 app:
 	@echo "Building Secure Obj Test APP"
-	$(VPREFIX)$(CC) -Iinclude/ -o app/test app/test.c -lsecurekey -Lout/securekey_lib/ $(SECUREKEY_LFLAGS)
+	$(VPREFIX)$(CC) -Iinclude/ -o app/test app/test.c -lsecure_obj -Lout/securekey_lib/ $(SECUREKEY_LFLAGS)
 	mv app/test ${EXPORT_DIR}/app
 
 install:
 	mkdir -p ${EXPORT_DIR}/lib ${EXPORT_DIR}/include ${EXPORT_DIR}/app
-	cp ${OUT_DIR}/libsecurekey.so ${EXPORT_DIR}/lib
-	cp ${OUT_DIR}/libsecurekey.a ${EXPORT_DIR}/lib
+	cp ${OUT_DIR}/libsecure_obj.so ${EXPORT_DIR}/lib
+	cp ${OUT_DIR}/libsecure_obj.a ${EXPORT_DIR}/lib
 	cp ${CURDIR}/include/*.h ${EXPORT_DIR}/include
 
 ################################################################################
