@@ -16,9 +16,9 @@ EXPORT_DIR ?= $(O)/export
 OUT_DIR ?= $(O)/securekey_lib
 
 .PHONY: all securekey_lib install \
-	clean distclean app
+	clean distclean sobj_app
 
-all: securekey_lib securekey_static_lib app install
+all: securekey_lib securekey_static_lib install sobj_app
 
 LIB_NAME	:= libsecurekey.so
 STATIC_LIB_NAME        := libsecurekey.a
@@ -57,16 +57,24 @@ $(SECUREKEY_OBJ_DIR)/%.o: ${SECUREKEY_SRC_DIR}/%.c
 	@echo "  CC      $<"
 	$(VPREFIX)$(CC) $(SECUREKEY_CFLAGS) -c $< -o $@
 
+sobj_app:
+	@echo "Building Secure Object APP: sobj_app"
+	$(VPREFIX)$(CC) -I$(OPENSSL_PATH)/include -Iinclude/ \
+	-o app/utils.o app/utils.c \
+	-o app/sobj_app app/sobj_app.c \
+	-lsecurekey -Lout/securekey_lib/ $(SECUREKEY_LFLAGS) -L$(OPENSSL_PATH) -lssl -lcrypto
+	mv app/sobj_app ${EXPORT_DIR}/app
+
 app:
-	@echo "Building securekey app"
+	@echo "Building Secure Obj Test APP"
 	$(VPREFIX)$(CC) -Iinclude/ -o app/test app/test.c -lsecurekey -Lout/securekey_lib/ $(SECUREKEY_LFLAGS)
+	mv app/test ${EXPORT_DIR}/app
 
 install:
 	mkdir -p ${EXPORT_DIR}/lib ${EXPORT_DIR}/include ${EXPORT_DIR}/app
 	cp ${OUT_DIR}/libsecurekey.so ${EXPORT_DIR}/lib
 	cp ${OUT_DIR}/libsecurekey.a ${EXPORT_DIR}/lib
 	cp ${CURDIR}/include/*.h ${EXPORT_DIR}/include
-	mv app/test ${EXPORT_DIR}/app
 
 ################################################################################
 # Cleaning up configuration
