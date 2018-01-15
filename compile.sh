@@ -1,7 +1,6 @@
 export CROSS_COMPILE_HOST=$CROSS_COMPILE
 export CROSS_COMPILE_TA=$CROSS_COMPILE
 
-
 if [ "$1" != "clean" ]; then
 if [ -d images ]; then
 	rm -rf images;
@@ -14,6 +13,12 @@ make;
 cd -;
 echo ""
 
+echo "Building Secure Key Kernel Module";
+cd securekeydev;
+make clean;
+make;
+cd -;
+
 echo "Building Secure Object Library";
 cd securekey_lib;
 make clean;
@@ -24,9 +29,13 @@ mkdir images;
 cp secure_storage_ta/ta/b05bcf48-9732-4efa-a9e0-141c7c888c34.ta images;
 cp securekey_lib/out/export/lib/libsecure_obj.so images;
 cp securekey_lib/out/export/app/* images;
+cp securekeydev/securekeydev.ko images;
 else
-echo "Cleaning TA and Lib"
+echo "Cleaning TA, Secure Obj Lib and Securekeydev"
 cd secure_storage_ta;
+make clean;
+cd -;
+cd securekeydev;
 make clean;
 cd -;
 cd securekey_lib;

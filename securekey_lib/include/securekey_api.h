@@ -11,6 +11,7 @@
 #define _SECUREKEY_API_H_
 
 #include "securekey_api_types.h"
+#include "securekey_mp.h"
 
 /* SK stands for: Secure Key */
 
