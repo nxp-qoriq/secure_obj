@@ -76,7 +76,7 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 	uint32_t byte_key_size;
 	uint8_t *padded_from = NULL;
 	uint16_t out_len = 0;
-	int ret;
+	int ret = 0;
 
 	SK_RET_CODE sk_ret = SKR_OK;
 	SK_MECHANISM_INFO mechType = {0};
