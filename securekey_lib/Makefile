@@ -16,9 +16,9 @@ EXPORT_DIR ?= $(O)/export
 OUT_DIR ?= $(O)/securekey_lib
 
 .PHONY: all securekey_lib install \
-	clean distclean sobj_app mp_app mp_verify sobj_eng_app
+	clean distclean sobj_app mp_app mp_verify
 
-all: securekey_lib securekey_static_lib install sobj_app mp_app mp_verify sobj_eng_app
+all: securekey_lib securekey_static_lib install sobj_app mp_app mp_verify
 
 LIB_NAME	:= libsecure_obj.so
 STATIC_LIB_NAME        := libsecure_obj.a
@@ -80,11 +80,6 @@ mp_verify:
 	@echo "Building Secure MP Feature Verification APP"
 	$(VPREFIX)$(CC) -Iinclude/ -I$(OPENSSL_PATH)/include -o app/mp_verify app/mp_verify.c -L$(OPENSSL_PATH) -lssl -lcrypto $(SECUREKEY_LFLAGS)
 	mv app/mp_verify ${EXPORT_DIR}/app
-
-sobj_eng_app:
-	@echo "Building Secure Object OpenSSL Engine App"
-	$(VPREFIX)$(CC) -Iinclude/ -I$(OPENSSL_PATH)/include -o app/sobj_eng_app app/sobj_eng_app.c -L$(OPENSSL_PATH) -lssl -lcrypto
-	mv app/sobj_eng_app ${EXPORT_DIR}/app
 
 install:
 	mkdir -p ${EXPORT_DIR}/lib ${EXPORT_DIR}/include ${EXPORT_DIR}/app

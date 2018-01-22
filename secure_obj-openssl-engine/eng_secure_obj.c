@@ -213,6 +213,8 @@ static EVP_PKEY *secure_obj_engine_load_priv_key(ENGINE *e,
 	obj_type = SK_KEY_PAIR;
 	key_type = SKK_RSA;
 
+	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
+
 	attrs[0].type = SK_ATTR_OBJECT_TYPE;
 	attrs[0].value = &obj_type;
 	attrs[0].valueLen = sizeof(SK_OBJECT_TYPE);
@@ -225,7 +227,7 @@ static EVP_PKEY *secure_obj_engine_load_priv_key(ENGINE *e,
 	attrs[2].value = (char *)key_file;
 	attrs[2].valueLen = strlen(key_file);
 
-	hObject = malloc(sizeof(SK_OBJECT_HANDLE));
+	hObject = (SK_OBJECT_HANDLE *)malloc(sizeof(SK_OBJECT_HANDLE));
 	if (!hObject) {
 		print_error("malloc failed for SK_OBJECT_HANDLE\n");
 		goto failure;
@@ -238,6 +240,9 @@ static EVP_PKEY *secure_obj_engine_load_priv_key(ENGINE *e,
 	}
 
 	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * 3);
+
+	if (objCount == 0)
+		goto failure;
 
 	attrs[0].type = SK_ATTR_MODULUS;
 	attrs[0].value = NULL;
@@ -261,7 +266,7 @@ static EVP_PKEY *secure_obj_engine_load_priv_key(ENGINE *e,
 		attrs[i].value = (void *)malloc(attrs[i].valueLen);
 		if (!attrs[i].value) {
 			print_error("malloc failed ATTR[%d].Value\n", i);
-			goto failure;;
+			goto failure;
 		}
 	}
 

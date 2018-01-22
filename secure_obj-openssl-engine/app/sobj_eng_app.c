@@ -49,7 +49,7 @@ void printLastError(char *msg)
 	free(err);
 }
 
-int main()
+int main(int argc, char *argv[])
 {
 	char plainText[] = "This is test data to be tested"; //key length : 2048
 	const char *engine_id = "dynamic";
@@ -58,6 +58,13 @@ int main()
 	uint8_t *encrypted = NULL, *decrypted = NULL, ret = 0;
 	EVP_PKEY *priv_key;
 	ENGINE *eng;
+
+	if (argc <= 1) {
+		printf("Please give the label of Private Key to be used\n");
+		exit(0);
+	}
+
+	printf("Device Key Label = %s\n", argv[1]);
 
 	ENGINE_load_builtin_engines();
 
@@ -74,9 +81,9 @@ int main()
 	ENGINE_ctrl_cmd_string(eng, "LOAD", NULL, 0);
 
 	/* RSA Key object with label "dev_key" is being genreated by sobj_app */
-	priv_key = ENGINE_load_private_key(eng, "dev_key", NULL, NULL);
+	priv_key = ENGINE_load_private_key(eng, argv[1], NULL, NULL);
 	if (priv_key == NULL) {
-		printf("Loading key failed = NULL\n");
+		printf("Key with Label %s not found.\n", argv[1]);
 		ret = 1;
 		goto failure;
 	}
