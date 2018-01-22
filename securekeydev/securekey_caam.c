@@ -16,7 +16,6 @@
 
 struct completion comp;
 int job_comp_status;
-enum rta_sec_era rta_sec_era = RTA_SEC_ERA_8;
 
 static inline void print_desc(uint32_t *buff, int size)
 {
@@ -28,7 +27,7 @@ static inline void print_desc(uint32_t *buff, int size)
 	}
 
 	for (i = 0; i < size; i++)
-		pr_info("%08x\n", buff[i]);
+		pr_err("%08x\n", buff[i]);
 }
 
 /*
@@ -86,6 +85,7 @@ static int32_t caam_submit_mp_get_pub_key_op(struct device *dev,
 		goto desc_kmalloc_fail;
 	}
 
+	memset(desc, 0, CAAM_DESC_BYTES_MAX);
 	ret = build_mp_get_pubkey_desc(desc, mp_req->pub_key);
 	if (!ret) {
 		pr_err("error: %s: build_mp_get_pubkey_desc\n",
@@ -95,8 +95,8 @@ static int32_t caam_submit_mp_get_pub_key_op(struct device *dev,
 	}
 
 #if 0
-	printk("public key desc\n");
-	print_desc(desc, ret);
+	pr_err("public key desc\n");
+	print_desc(desc, 64);
 #endif
 
 	ret = submit_job(dev, desc);
@@ -126,16 +126,19 @@ static int32_t caam_submit_mp_sign_op(struct device *dev,
 		goto desc_kmalloc_fail;
 	}
 
+	memset(desc, 0, CAAM_DESC_BYTES_MAX);
 	ret = build_mp_sign_desc(desc, mp_req->msg, mp_req->msg_len,
 		mp_req->hash, mp_req->r, mp_req->s);
 	if (!ret) {
 		pr_err("error: %s: build_mp_sign_desc\n", __func__);
 		goto cleanall;
 	}
+
 #if 0
-	printk("desc\n");
-	print_desc(descbuf, ret);
+	pr_err("signing desc\n");
+	print_desc(desc, 64);
 #endif
+
 	ret = submit_job(dev, desc);
 	if (ret)
 		pr_err("error: %s: submit_job\n", __func__);

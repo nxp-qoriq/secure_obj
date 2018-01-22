@@ -5,9 +5,6 @@
 #
 KBUILD_CFLAGS += -I${KERNEL_SRC}/include/
 KBUILD_CFLAGS += -I$(src) -I${KERNEL_SRC}/drivers/crypto
-KBUILD_CFLAGS += -I$(src) -I${FLIB_RTA_PATH}/sec/rta/include
-KBUILD_CFLAGS += -I$(src) -I${FLIB_RTA_PATH}/sec/rta/include/rta
-KBUILD_CFLAGS += -I$(src) -I${FLIB_RTA_PATH}/sec/rta/include/desc
 
 .SILENT:
 securekeydev-objs = securekey_caam.o ioctl.o
