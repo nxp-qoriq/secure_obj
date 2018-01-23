@@ -1,3 +1,8 @@
+/*
+  * Copyright 2017 NXP
+  * SPDX-License-Identifier:     BSD-3-Clause
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <sched.h>
@@ -24,7 +29,7 @@
 /* This function gets the MP Public key and dumps it in a file */
 uint8_t get_mp_pub_key(void)
 {
-	int ret;
+	int ret = 0;
 	uint8_t *temp;
 	enum sk_status_code ret_status;
 	struct sk_EC_point pub_key_req;
@@ -89,7 +94,7 @@ temp_malloc_fail:
 /* This function sign the message and dumps Signature in a file */
 uint8_t sign_msg(char *msg_ptr)
 {
-	int i = 0, ret;
+	int i = 0, ret = 0;
 	uint8_t *temp;
 	enum sk_status_code ret_status;
 	uint8_t *msg, *digest, *sig_r, *sig_s;
@@ -172,7 +177,7 @@ temp_malloc_fail:
 /* This function gets the OEMID and dumps it in a file */
 uint8_t get_oemid(void)
 {
-	uint8_t ret, i;
+	uint8_t ret = 0, i;
 	uint8_t *oem_id;
 	uint8_t oem_id_len;
 	FILE *fptr;
@@ -220,7 +225,7 @@ mp_tag_malloc_fail:
 /* This function gets the FUID and dumps it in a file */
 uint8_t get_fuid(void)
 {
-	uint8_t ret, i;
+	uint8_t ret = 0, i;
 	uint8_t *fuid;
 	uint8_t fuid_len;
 	FILE *fptr;
@@ -267,7 +272,7 @@ fuid_malloc_fail:
 /* This function gets the MP Message and dumps it in a file */
 uint8_t get_mp_tag(void)
 {
-	uint8_t ret, i;
+	uint8_t ret = 0, i;
 	uint8_t *mp_tag;
 	uint8_t mp_tag_len;
 	FILE *fptr;

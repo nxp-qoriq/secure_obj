@@ -1,3 +1,8 @@
+/*
+  * Copyright 2017 NXP
+  * SPDX-License-Identifier:     BSD-3-Clause
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <sched.h>
@@ -35,8 +40,11 @@ uint8_t get_data_from_file(const char *file_ptr, uint8_t *ptr, uint8_t data_len)
 	ncount = fread(data, 1, data_len, fptr);
 	if (ncount != data_len) {
 		printf("data_len and length of data read is not same\n");
+		fclose(fptr);
 		return -1;
 	}
+
+	fclose(fptr);
 	return 0;
 }
 
