@@ -1,5 +1,6 @@
 #Makefile for eng_secure_obj
 
+CC := $(CROSS_COMPILE)gcc
 INCLUDES = -I./ -I${OPENSSL_PATH}/ -I${OPENSSL_PATH}/include/ -I${OPENSSL_PATH}/crypto/include/ -I../securekey_lib/include/
 
 all : engine sobj_eng_app
