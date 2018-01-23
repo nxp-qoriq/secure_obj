@@ -1,6 +1,6 @@
 /*
   * Copyright 2017 NXP
-  * SPDX-License-Identifier:     BSD-3-Clause
+  * SPDX-License-Identifier:    GPL-2.0+
 */
 
 #ifndef __SECUREKEY_DESC_H__
