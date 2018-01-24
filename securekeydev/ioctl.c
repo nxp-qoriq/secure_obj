@@ -29,7 +29,8 @@
 
 MODULE_AUTHOR("NXP Semiconductor");
 MODULE_DESCRIPTION("Securekey driver");
-MODULE_LICENSE("");
+MODULE_LICENSE("GPL v2");
+MODULE_VERSION("1.0");
 
 /* ====== Module parameters ====== */
 int securekeydev_verbosity;
