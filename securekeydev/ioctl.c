@@ -566,7 +566,7 @@ static struct ctl_table verbosity_ctl_dir[] = {
 		.mode           = 0644,
 		.proc_handler   = proc_dointvec,
 	},
-	{0, },
+	{},
 };
 
 static struct ctl_table verbosity_ctl_root[] = {
@@ -575,7 +575,7 @@ static struct ctl_table verbosity_ctl_root[] = {
 		.mode           = 0555,
 		.child          = verbosity_ctl_dir,
 	},
-	{0, },
+	{},
 };
 static struct ctl_table_header *verbosity_sysctl_header;
 
