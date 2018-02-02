@@ -1,3 +1,7 @@
-This repo contains 2 things:
-1. Securekey Library code.
-2. Secure Storage TA code.
+This repo contains 4 things:
+1. securekey_lib - Secure Object Library.
+2. secure_storage_ta - Trusted application for Secure Object library.
+3. securekeydev - Kernel Module for offloading MP Key feature to CAAM.
+4. secure_obj-openssl-engine - OpenSSL Engine based on Secure Object Library offloading RSA Private Key operation.
+
+For more information refer to LSDK documentation @ https://lsdk.github.io/document.html
