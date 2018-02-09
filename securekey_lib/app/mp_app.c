@@ -14,16 +14,6 @@
 #include <ctype.h>
 #include <unistd.h>
 
-#include <openssl/rsa.h>
-#include <openssl/engine.h>
-#include <openssl/bn.h>
-#include <openssl/err.h>
-#include <openssl/pem.h>
-#include <openssl/ssl.h>
-#include <openssl/bio.h>
-#include <openssl/evp.h>
-#include <openssl/aes.h>
-
 #include <securekey_api.h>
 
 /* This function gets the MP Public key and dumps it in a file */
