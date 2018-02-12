@@ -27,6 +27,7 @@ struct getOptValue {
 	SK_MECHANISM_TYPE mech_type;
 	char *label;
 	int findCritCount;
+	uint8_t write_to_file;
 };
 
 int generate_rsa_key(rsa_3form_key_t *rsa_3form_key, struct getOptValue *getOptVal)
@@ -268,6 +269,8 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 	SK_ATTRIBUTE attrs[4];
 	SK_OBJECT_HANDLE hObject;
 	SK_MECHANISM_INFO mechanismType = {0};
+	FILE *fptr = NULL;
+	char *label = NULL;
 	static const uint8_t rsa_pub_exp[] = {
 		0x01, 0x00, 0x01
 	};
@@ -294,10 +297,44 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 	if (ret != SKR_OK) {
 		printf("SK_GenerateKeyPair failed wit err code = 0x%x\n", ret);
 		ret = APP_SKR_ERR;
+		goto end;
 	} else {
 		ret = APP_OK;
 		printf("Object generated successfully handle = %u\n", hObject);
 	}
+
+	/* Here we are generating a fake .pem file for satisfying kubernetes
+	 * use case */
+	 if (getOptVal->write_to_file) {
+		label = (char *)malloc(strlen(getOptVal->label) + strlen(".pem"));
+		if (!label) {
+			printf("malloc failed\n");
+			ret = APP_SKR_ERR;
+			goto end;
+		}
+		strcat(label, getOptVal->label);
+		strcat(label, ".pem");
+
+		fptr = fopen(label, "wb");
+		if (fptr == NULL) {
+			printf("File does not exists\n");
+			ret = APP_SKR_ERR;
+			goto end;
+		}
+
+		if (!PEM_write(fptr, "RSA SECURE_OBJ PRIVATE KEY", "",
+			getOptVal->label, strlen(getOptVal->label))) {
+			printf("PEM_WRITE failed\n");
+			ret = APP_SKR_ERR;
+		}
+	}
+
+end:
+	if (fptr)
+		fclose(fptr);
+
+	if (label)
+		free(label);
 
 	return ret;
 }
@@ -561,6 +598,9 @@ int process_sub_option(int option, char *optarg, struct getOptValue *getOptVal)
 		if (U32_INVALID == getOptVal->mech_type)
 			ret = APP_IP_ERR;
 		break;
+	case 'w':
+		getOptVal->write_to_file = 1;
+		break;
 	}
 	return ret;
 }
@@ -678,13 +718,14 @@ int main(int argc, char *argv[])
 		.obj_id = U32_UNINTZD,
 		.mech_type = U32_UNINTZD,
 		.findCritCount = 0,
+		.write_to_file = 0,
 	};
 
 	int option;
 	extern char *optarg; extern int optind;
 	int ret = APP_OK;
 
-	while ((option = getopt(argc, argv, "CGRLAf:i:k:gh:l:o:m:n:s:")) != -1) {
+	while ((option = getopt(argc, argv, "CGRLAf:i:k:gh:l:o:m:n:s:w")) != -1) {
 		ret = process_main_option(PARSE, option, optarg, &getOptVal);
 		if (ret != APP_OK)
 			break;
