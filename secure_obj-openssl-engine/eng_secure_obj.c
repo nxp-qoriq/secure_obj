@@ -209,11 +209,36 @@ static EVP_PKEY *secure_obj_engine_load_priv_key(ENGINE *e,
 	SK_OBJECT_TYPE obj_type;
 	SK_KEY_TYPE key_type;
 	uint32_t objCount, i = 0;
+	const char *key_label;
+	uint16_t key_label_len;
+	FILE *fptr;
+	char *name, *header;
+	unsigned char *data;
+	long data_len;
 
 	obj_type = SK_KEY_PAIR;
 	key_type = SKK_RSA;
 
 	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
+
+	fptr = fopen(key_file, "rb");
+	if (fptr != NULL) {
+		if (!PEM_read(fptr, &name, &header, &data, &data_len)) {
+			print_error("File does not exists\n");
+			goto failure;
+		}
+
+		if (!strcmp(name, "RSA SECURE_OBJ PRIVATE KEY")) {
+			key_label = data;
+			key_label_len = data_len;
+		} else {
+			print_error("Not supported key passed\n");
+			goto failure;
+		}
+	} else {
+		key_label = key_file;
+		key_label_len = strlen(key_file);
+	}
 
 	attrs[0].type = SK_ATTR_OBJECT_TYPE;
 	attrs[0].value = &obj_type;
@@ -224,8 +249,8 @@ static EVP_PKEY *secure_obj_engine_load_priv_key(ENGINE *e,
 	attrs[1].valueLen = sizeof(SK_KEY_TYPE);
 
 	attrs[2].type = SK_ATTR_OBJECT_LABEL;
-	attrs[2].value = (char *)key_file;
-	attrs[2].valueLen = strlen(key_file);
+	attrs[2].value = (char *)key_label;
+	attrs[2].valueLen = key_label_len;
 
 	hObject = (SK_OBJECT_HANDLE *)malloc(sizeof(SK_OBJECT_HANDLE));
 	if (!hObject) {
@@ -305,6 +330,8 @@ static EVP_PKEY *secure_obj_engine_load_priv_key(ENGINE *e,
 	goto success;
 
 failure:
+	if (fptr)
+		fclose(fptr);
 	if (rsa)
 		RSA_free(rsa);
 	if (rsa_n)
