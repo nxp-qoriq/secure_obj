@@ -120,7 +120,8 @@ TEE_Result TA_SignDigest(uint32_t param_types, TEE_Param params[4])
 	/* Try to open object */
 	res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, (void *)&obj_id,
 				       sizeof(uint32_t),
-				       TEE_DATA_FLAG_ACCESS_READ,
+				       TEE_DATA_FLAG_ACCESS_READ |
+				       TEE_DATA_FLAG_SHARE_READ,
 				       &pObject);
 	if (res != TEE_SUCCESS)
 		goto out;
@@ -233,7 +234,8 @@ TEE_Result TA_DecryptData(uint32_t param_types, TEE_Param params[4])
 	/* Try to open object */
 	res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, (void *)&obj_id,
 				       sizeof(uint32_t),
-				       TEE_DATA_FLAG_ACCESS_READ,
+				       TEE_DATA_FLAG_ACCESS_READ |
+				       TEE_DATA_FLAG_SHARE_READ,
 				       &pObject);
 	if (res != TEE_SUCCESS)
 		goto out;

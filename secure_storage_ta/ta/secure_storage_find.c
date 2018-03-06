@@ -74,7 +74,8 @@ static TEE_Result match_attr_obj(SK_ATTRIBUTE *attrs, uint32_t attr_count,
 	/* Try to open object */
 	res = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, (void *)obj_id,
 				       sizeof(uint32_t),
-				       TEE_DATA_FLAG_ACCESS_READ, &hObject);
+				       TEE_DATA_FLAG_ACCESS_READ |
+				       TEE_DATA_FLAG_SHARE_READ, &hObject);
 	if (res != TEE_SUCCESS)
 		goto out;
 

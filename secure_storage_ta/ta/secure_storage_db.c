@@ -18,9 +18,10 @@ TEE_Result TA_OpenDatabase(void)
 
 	/* Try to open object database object */
 	ret = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, (void *)db_obj_id,
-				       sizeof(db_obj_id),
-				       TEE_DATA_FLAG_ACCESS_WRITE |
-				       TEE_DATA_FLAG_ACCESS_READ, &hObject);
+					sizeof(db_obj_id),
+					TEE_DATA_FLAG_SHARE_READ |
+					TEE_DATA_FLAG_ACCESS_READ,
+					&hObject);
 
 	if (ret == TEE_SUCCESS) {
 		DMSG("DB object already exist!!\n");
@@ -37,12 +38,11 @@ TEE_Result TA_OpenDatabase(void)
 
 	DMSG("Create new DB object!!\n");
 	ret = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE, db_obj_id,
-					 sizeof(db_obj_id),
-					 TEE_DATA_FLAG_ACCESS_WRITE |
-					 TEE_DATA_FLAG_ACCESS_READ, NULL,
-					 &obj_id_init, sizeof(obj_id_init),
-					 NULL);
-
+					sizeof(db_obj_id),
+					TEE_DATA_FLAG_ACCESS_WRITE,
+					NULL,
+					&obj_id_init, sizeof(obj_id_init),
+					NULL);
 	return ret;
 }
 
@@ -56,7 +56,9 @@ TEE_Result TA_GetNextObjectID(uint32_t *next_obj_id)
 	ret = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, (void *)db_obj_id,
 				       sizeof(db_obj_id),
 				       TEE_DATA_FLAG_ACCESS_WRITE |
-				       TEE_DATA_FLAG_ACCESS_READ, &hObject);
+				       TEE_DATA_FLAG_SHARE_WRITE |
+				       TEE_DATA_FLAG_ACCESS_READ |
+				       TEE_DATA_FLAG_SHARE_READ, &hObject);
 	if (ret != TEE_SUCCESS)
 		goto out;
 

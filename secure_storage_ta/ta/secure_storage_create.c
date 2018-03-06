@@ -172,11 +172,11 @@ TEE_Result TA_CreateObject(uint32_t param_types, TEE_Param params[4])
 
 	DMSG("Create Persistent Object!\n");
 	res = TEE_CreatePersistentObject(TEE_STORAGE_PRIVATE, &next_obj_id,
-					 sizeof(next_obj_id),
-					 TEE_DATA_FLAG_ACCESS_WRITE |
-					 TEE_DATA_FLAG_ACCESS_READ,
-					 tObject, data, data_len,
-					 TEE_HANDLE_NULL);
+					sizeof(next_obj_id),
+					TEE_DATA_FLAG_ACCESS_WRITE |
+					TEE_DATA_FLAG_ACCESS_READ,
+					tObject, data, data_len,
+					TEE_HANDLE_NULL);
 	if (res != TEE_SUCCESS)
 		goto out;
 
