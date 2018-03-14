@@ -12,6 +12,8 @@
 #include <unistd.h>
 #include "utils.h"
 
+#define	SOBJ_KEY_ID	0xE1E2E3E4
+
 struct getOptValue {
 	uint32_t main_option;
 	uint32_t numOfMainOpt;
@@ -27,7 +29,7 @@ struct getOptValue {
 	SK_MECHANISM_TYPE mech_type;
 	char *label;
 	int findCritCount;
-	uint8_t write_to_file;
+	char *write_to_file;
 };
 
 int generate_rsa_key(rsa_3form_key_t *rsa_3form_key, struct getOptValue *getOptVal)
@@ -263,14 +265,131 @@ cleanup:
 	return ret;
 }
 
+unsigned char *copy_bio_data(BIO *out, int *data_lenp)
+{
+	unsigned char *data, *tdata;
+	int data_len;
+
+	data_len = BIO_get_mem_data(out, &tdata);
+	data = malloc(data_len+1);
+	if (data) {
+		memcpy(data, tdata, data_len);
+		data[data_len]='\0';  // Make sure it's \0 terminated, in case used as string
+		if (data_lenp) {
+			*data_lenp = data_len;
+		}
+	} else {
+		printf("malloc failed");
+	}
+	return data;
+}
+
+char *generate_fake_private_RSA_key (int key_size, uint32_t obj_id,
+	void *pub_exp, uint16_t pub_exp_len, void *modulus, uint16_t modulus_len)
+{
+	char *key_data = NULL, *priv_key_exp_temp;
+	uint32_t *priv_key_exp, priv_key_len  = 0;
+	int i = 0, j = 0;
+
+	RSA *rsa = RSA_new();
+	if (!rsa) {
+		goto end;
+		printf("RSA_new failed\n");
+	}
+
+	BIGNUM *bn = BN_new();
+	if (!bn) {
+		printf("BN_new failed\n");
+		goto end;
+	}
+
+	BN_set_word(bn, 0x10001);
+	RSA_generate_key_ex(rsa, key_size, bn, NULL);
+
+	rsa->e = BN_bin2bn(pub_exp, pub_exp_len, rsa->e);
+	if (!rsa->e) {
+		printf("BN_bin2bn failed for pub exp\n");
+		goto end;
+	}
+
+	rsa->n = BN_bin2bn(modulus, modulus_len, rsa->n);
+	if (!rsa->n) {
+		printf("BN_bin2bn failed for modulus\n");
+		goto end;
+	}
+
+	priv_key_len = RSA_size(rsa);
+	priv_key_exp_temp = (char *)malloc(priv_key_len);
+	if (!priv_key_exp_temp) {
+		printf("malloc failed for priv_key_exp_temp\n");
+		goto end;
+	}
+
+	BN_bn2bin(rsa->d, priv_key_exp_temp);
+
+	priv_key_exp_temp[0] = 0x10;
+
+	priv_key_exp = (uint32_t *)priv_key_exp_temp;
+
+#if 0
+	for (i = 1; i < priv_key_len; i++) {
+		priv_key_exp_temp[i] = 0x00;
+	}
+#endif
+
+	priv_key_exp_temp[priv_key_len - 1] = obj_id;
+	for (j=0; j<2; j++) {
+		for (i=5; i<9; i++) {
+			priv_key_exp_temp[priv_key_len-i-(j*4)] = (uint8_t)(SOBJ_KEY_ID>> 8*(i-5));
+                        }
+	}
+
+#if 0
+	for (i = 0; i < priv_key_len; i++) {
+		printf("%02x:", priv_key_exp_temp[i]);
+		if (((i+1) %16) == 0)
+			printf("\n");
+	}
+#endif
+
+	rsa->d = BN_bin2bn((char *)priv_key_exp, priv_key_len, rsa->d);
+	if (!rsa->d) {
+		printf("BN_bin2bn failed for priv exp\n");
+		goto end;
+	}
+
+	BIO *out = BIO_new(BIO_s_mem());
+	if (!out) {
+		printf("BIO_new failed\n");
+		goto end;
+	}
+
+	PEM_write_bio_RSAPrivateKey(out, rsa, NULL, NULL, 0, NULL, NULL);
+	key_data = (char *)copy_bio_data(out, NULL);
+
+end:
+	if (out)
+		BIO_free(out);
+	if (bn)
+		BN_free(bn);
+	if (rsa)
+		RSA_free(rsa);
+	if (priv_key_exp)
+		free(priv_key_exp);
+	return (key_data);
+}
+
 static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 {
-	int ret = APP_OK;
+	int ret = APP_OK, i = 0;
+	SK_RET_CODE sk_ret;
 	SK_ATTRIBUTE attrs[4];
 	SK_OBJECT_HANDLE hObject;
 	SK_MECHANISM_INFO mechanismType = {0};
 	FILE *fptr = NULL;
-	char *label = NULL;
+	char *label = NULL, *file_name = NULL;
+	char *key_data = NULL;
+	uint32_t obj_id;
 	static const uint8_t rsa_pub_exp[] = {
 		0x01, 0x00, 0x01
 	};
@@ -293,9 +412,9 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 	attrs[3].value = (void *)rsa_pub_exp;
 	attrs[3].valueLen = sizeof(rsa_pub_exp);
 
-	ret = SK_GenerateKeyPair(&mechanismType, attrs, 4, &hObject);
-	if (ret != SKR_OK) {
-		printf("SK_GenerateKeyPair failed wit err code = 0x%x\n", ret);
+	sk_ret = SK_GenerateKeyPair(&mechanismType, attrs, 4, &hObject);
+	if (sk_ret != SKR_OK) {
+		printf("SK_GenerateKeyPair failed wit err code = 0x%x\n", sk_ret);
 		ret = APP_SKR_ERR;
 		goto end;
 	} else {
@@ -303,38 +422,82 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 		printf("Object generated successfully handle = %u\n", hObject);
 	}
 
-	/* Here we are generating a fake .pem file for satisfying kubernetes
-	 * use case */
+	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * 4);
+
+	attrs[0].type = SK_ATTR_PUBLIC_EXPONENT;
+	attrs[0].value = NULL;
+	attrs[0].valueLen = 0;
+
+	attrs[1].type = SK_ATTR_MODULUS;
+	attrs[1].value = NULL;
+	attrs[1].valueLen = 0;
+
+	sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+	if (sk_ret != SKR_OK) {
+		if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
+			printf("\nObject Handle[%d] not found.\n", hObject);
+		else
+			printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
+
+		ret = APP_SKR_ERR;
+		goto end;
+	}
+
+	ret = APP_OK;
+	for (i = 0; i < 2; i++) {
+		if ((int16_t)(attrs[i].valueLen) != -1) {
+			attrs[i].value =
+				(void *)malloc(attrs[i].valueLen);
+
+			if (!attrs[i].value) {
+				printf("malloc failed ATTR[%d].Value\n", i);
+				ret = APP_MALLOC_FAIL;
+				goto end;
+			}
+		}
+	}
+
+	sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+	if (sk_ret != SKR_OK) {
+		printf("Failed to Get Attribute Values.\n");
+		ret = APP_SKR_ERR;
+		goto end;
+	}
+
+	/* Here we are generating a fake .pem file for satisfying
+	kubernetes/puppet use case */
 	 if (getOptVal->write_to_file) {
-		label = (char *)malloc(strlen(getOptVal->label) + strlen(".pem"));
-		if (!label) {
-			printf("malloc failed\n");
+		obj_id = getOptVal->obj_id;
+		file_name = getOptVal->write_to_file;
+
+		key_data = generate_fake_private_RSA_key(getOptVal->key_len, obj_id,
+			attrs[0].value, attrs[0].valueLen,
+			attrs[1].value, attrs[1].valueLen);
+		if (!key_data) {
+			printf("generate_fake_private_RSA_key failed \n");
 			ret = APP_SKR_ERR;
 			goto end;
 		}
-		strcat(label, getOptVal->label);
-		strcat(label, ".pem");
 
-		fptr = fopen(label, "wb");
+		fptr = fopen(file_name, "wb");
 		if (fptr == NULL) {
 			printf("File does not exists\n");
 			ret = APP_SKR_ERR;
 			goto end;
 		}
-
-		if (!PEM_write(fptr, "RSA SECURE_OBJ PRIVATE KEY", "",
-			getOptVal->label, strlen(getOptVal->label))) {
-			printf("PEM_WRITE failed\n");
-			ret = APP_SKR_ERR;
-		}
+		fwrite(key_data, sizeof(char), strlen(key_data), fptr);
 	}
 
 end:
+	for (i = 0; i < 2; i++) {
+		if (attrs[i].value)
+			free(attrs[i].value);
+	}
+
+	if (key_data)
+		free(key_data);
 	if (fptr)
 		fclose(fptr);
-
-	if (label)
-		free(label);
 
 	return ret;
 }
@@ -599,7 +762,7 @@ int process_sub_option(int option, char *optarg, struct getOptValue *getOptVal)
 			ret = APP_IP_ERR;
 		break;
 	case 'w':
-		getOptVal->write_to_file = 1;
+		getOptVal->write_to_file = optarg;
 		break;
 	}
 	return ret;
@@ -718,14 +881,14 @@ int main(int argc, char *argv[])
 		.obj_id = U32_UNINTZD,
 		.mech_type = U32_UNINTZD,
 		.findCritCount = 0,
-		.write_to_file = 0,
+		.write_to_file = NULL,
 	};
 
 	int option;
 	extern char *optarg; extern int optind;
 	int ret = APP_OK;
 
-	while ((option = getopt(argc, argv, "CGRLAf:i:k:gh:l:o:m:n:s:w")) != -1) {
+	while ((option = getopt(argc, argv, "CGRLAf:i:k:gh:l:o:m:n:s:w:")) != -1) {
 		ret = process_main_option(PARSE, option, optarg, &getOptVal);
 		if (ret != APP_OK)
 			break;

@@ -58,6 +58,7 @@ int main(int argc, char *argv[])
 	uint8_t *encrypted = NULL, *decrypted = NULL, ret = 0;
 	EVP_PKEY *priv_key;
 	ENGINE *eng;
+	FILE *fptr;
 
 	if (argc <= 1) {
 		printf("Please give the label of Private Key to be used\n");
@@ -80,6 +81,21 @@ int main(int argc, char *argv[])
 	ENGINE_ctrl_cmd_string(eng, "ID", "eng_secure_obj", 0);
 	ENGINE_ctrl_cmd_string(eng, "LOAD", NULL, 0);
 
+	fptr = fopen(argv[1], "rb");
+	if (!fptr) {
+		printf("fopen failed.\n");
+		ret = 1;
+		goto failure;
+	}
+
+	priv_key = PEM_read_PrivateKey(fptr, &priv_key, NULL, NULL);
+	if (priv_key == NULL) {
+		printf("Key with Label %s not found.\n", argv[1]);
+		ret = 1;
+		goto failure;
+	}
+
+#if 0
 	/* RSA Key object with label "dev_key" is being genreated by sobj_app */
 	priv_key = ENGINE_load_private_key(eng, argv[1], NULL, NULL);
 	if (priv_key == NULL) {
@@ -87,6 +103,7 @@ int main(int argc, char *argv[])
 		ret = 1;
 		goto failure;
 	}
+#endif
 
 	byte_key_size = RSA_size(priv_key->pkey.rsa);
 
