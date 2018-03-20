@@ -54,12 +54,12 @@ static const char *engine_id = "eng_secure_obj";
 static const char *engine_name = "Secure Object OpenSSL Engine.";
 
 static RSA_METHOD secureobj_rsa;
-int rsa_crypto_ex_data_index;
+
+#define	MAX_SEC_OBJECTS	50
 
 static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
                          unsigned char *to, RSA *rsa, int padding)
 {
-	uint32_t byte_key_size;
 	uint8_t *padded_from = NULL;
 	uint16_t out_len = 0;
 	int ret = 0, i = 0, j = 0;
@@ -68,14 +68,16 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 	SK_MECHANISM_INFO mechType = {0};
 
 	SK_ATTRIBUTE attrs[3];
-	SK_OBJECT_HANDLE hObject;
+	SK_OBJECT_HANDLE hObject = 0xFFFF, temp_hObject[MAX_SEC_OBJECTS];
 	SK_OBJECT_TYPE obj_type;
 	SK_KEY_TYPE key_type;
 	uint32_t objCount, key_index;
 	uint32_t rsa_key_len = 0;
-	char *priv_exp = NULL;
+	char *priv_exp = NULL, *modulus = NULL;
 	uint32_t sobj_key_id[2] = { 0, 0 };
 
+	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
+	memset(temp_hObject, 0, sizeof(SK_OBJECT_HANDLE) * MAX_SEC_OBJECTS);
 	rsa_key_len = RSA_size(rsa);
 
 	priv_exp = malloc(rsa_key_len);
@@ -85,7 +87,15 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 		goto failure;
 	}
 
+	modulus = malloc(rsa_key_len);
+	if (!modulus) {
+		print_error("malloc failed for modulus\n");
+		ret = -1;
+		goto failure;
+	}
+
 	BN_bn2bin(rsa->d, priv_exp);
+	BN_bn2bin(rsa->n, modulus);
 
 	for (j = 0; j<2; j++) {
 		for (i = 5;i<9;i++) {
@@ -95,7 +105,7 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 
 	if (!(((unsigned int)sobj_key_id[0] == (unsigned int)SOBJ_KEY_ID) &&
 		((unsigned int)sobj_key_id[1] == (unsigned int)SOBJ_KEY_ID))) {
-		print_error("Not a valid Secure Object Key, passing control to OpenSSL Function\n");
+		print_info("Not a valid Secure Object Key, passing control to OpenSSL Function\n");
 		ret = -2;
 		goto failure;
 	}
@@ -104,8 +114,6 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 
 	obj_type = SK_KEY_PAIR;
 	key_type = SKK_RSA;
-
-	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
 
 	mechType.mechanism = SKM_RSA_PKCS_NOPAD;
 
@@ -121,25 +129,65 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 	attrs[2].value = (void *)&key_index;
 	attrs[2].valueLen = sizeof(uint32_t);
 
-	sk_ret = SK_EnumerateObjects(attrs, 3, &hObject, 1, &objCount);
+	sk_ret = SK_EnumerateObjects(attrs, 3, temp_hObject, MAX_SEC_OBJECTS, &objCount);
 	if (sk_ret != SKR_OK) {
 		print_error("SK_EnumerateObjects failed with code = 0x%x\n", sk_ret);
 		ret = -1;
+		memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
 		goto failure;
 	}
 
+	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
 	if (objCount == 0) {
 		print_error("No object found\n");
 		ret = -1;
 		goto failure;
 	}
 
-	byte_key_size = RSA_size(rsa);
-	print_info("byte_key_size = %d\n", byte_key_size);
+	for (i = 0; i < objCount; i++) {
+		memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
+		attrs[0].type = SK_ATTR_MODULUS;
+		attrs[0].value = NULL;
+		attrs[0].valueLen = 0;
 
-	out_len = byte_key_size;
+		sk_ret = SK_GetObjectAttribute(temp_hObject[i], attrs, 1);
+		if (sk_ret != SKR_OK) {
+			print_error("SK_GetObjectAttribute failed for object %u with code = 0x%x\n",
+				temp_hObject[i], sk_ret);
+			continue;
+		}
 
-	padded_from = (uint8_t *)malloc(byte_key_size);
+		if ((int16_t)(attrs[0].valueLen) != -1) {
+			attrs[0].value =
+				(void *)malloc(attrs[0].valueLen);
+			if (!attrs[0].value) {
+				print_error("malloc failed ATTR[%d].Value\n", i);
+				goto failure;
+			}
+		}
+
+		sk_ret = SK_GetObjectAttribute(temp_hObject[i], attrs, 1);
+		if (sk_ret != SKR_OK) {
+			print_error("SK_GetObjectAttribute failed for object %u with code = 0x%x\n",
+				temp_hObject[i], sk_ret);
+			continue;
+		}
+
+		if (!memcmp(attrs[0].value, modulus, rsa_key_len)) {
+			hObject = temp_hObject[i];
+			break;
+		}
+	}
+
+	if (hObject == 0xFFFF) {
+		print_error("Key Correponding to pem passed is not present in HSM\n");
+		ret = -1;
+		goto failure;
+	}
+
+	out_len = rsa_key_len;
+
+	padded_from = (uint8_t *)malloc(rsa_key_len);
 	if (!padded_from) {
 		print_error("padded_from malloc failed\n");
 		ret = -1;
@@ -149,7 +197,7 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 	switch (padding) {
 		case RSA_PKCS1_PADDING:
 			ret = RSA_padding_add_PKCS1_type_1(padded_from,
-				byte_key_size, from, flen);
+				rsa_key_len, from, flen);
 			if (ret == 0) {
 				print_error("RSA_padding_add_PKCS1_type_1 failed\n");
 				ret = -1;
@@ -163,20 +211,27 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 	}
 
 	sk_ret = SK_Decrypt(&mechType, hObject, padded_from,
-			byte_key_size, to, &out_len);
+			rsa_key_len, to, &out_len);
 	if (sk_ret != SKR_OK) {
 		print_error("SK_Decrypt failed with ret code 0x%x\n", sk_ret);
 		ret = -1;
 		goto failure;
 	}
 
-	ret = byte_key_size;
+	ret = rsa_key_len;
 
 failure:
 	if (padded_from)
 		free(padded_from);
+	if (modulus)
+		free(modulus);
 	if (priv_exp)
 		free(priv_exp);
+
+	for (i = 0; i < 3; i++) {
+		if (attrs[i].value)
+			free(attrs[i].value);
+	}
 
 	if (ret == -2) {
 		const RSA_METHOD *rsa_meth = RSA_PKCS1_SSLeay();
@@ -190,30 +245,41 @@ static int secure_obj_rsa_priv_dec(int flen, const unsigned char *from,
                          unsigned char *to, RSA *rsa, int padding)
 {
 	uint8_t *padded_to = NULL;
-	uint16_t out_len  = 0;
+	uint16_t out_len = 0;
 	int ret = 0, i = 0, j = 0;
 
 	SK_RET_CODE sk_ret = SKR_OK;
 	SK_MECHANISM_INFO mechType = {0};
 
 	SK_ATTRIBUTE attrs[3];
-	SK_OBJECT_HANDLE hObject;
+	SK_OBJECT_HANDLE hObject = 0xFFFF, temp_hObject[MAX_SEC_OBJECTS];
 	SK_OBJECT_TYPE obj_type;
 	SK_KEY_TYPE key_type;
 	uint32_t objCount, key_index;
 	uint32_t rsa_key_len = 0;
-	char *priv_exp = NULL;
+	char *priv_exp = NULL, *modulus = NULL;
 	uint32_t sobj_key_id[2] = { 0, 0 };
 
+	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
+	memset(temp_hObject, 0, sizeof(SK_OBJECT_HANDLE) * MAX_SEC_OBJECTS);
 	rsa_key_len = RSA_size(rsa);
 
 	priv_exp = malloc(rsa_key_len);
 	if (!priv_exp) {
 		print_error("malloc failed for priv_exp_temp\n");
+		ret = -1;
+		goto failure;
+	}
+
+	modulus = malloc(rsa_key_len);
+	if (!modulus) {
+		print_error("malloc failed for modulus\n");
+		ret = -1;
 		goto failure;
 	}
 
 	BN_bn2bin(rsa->d, priv_exp);
+	BN_bn2bin(rsa->n, modulus);
 
 	for (j = 0; j < 2; j++) {
 		for (i = 5; i < 9; i++) {
@@ -223,7 +289,7 @@ static int secure_obj_rsa_priv_dec(int flen, const unsigned char *from,
 
 	if (!(((unsigned int)sobj_key_id[0] == (unsigned int)SOBJ_KEY_ID) &&
 		((unsigned int)sobj_key_id[1] == (unsigned int)SOBJ_KEY_ID))) {
-		print_error("Not a valid Secure Object Key, passing control to OpenSSL Function\n");
+		print_info("Not a valid Secure Object Key, passing control to OpenSSL Function\n");
 		ret = -2;
 		goto failure;
 	}
@@ -232,8 +298,6 @@ static int secure_obj_rsa_priv_dec(int flen, const unsigned char *from,
 
 	obj_type = SK_KEY_PAIR;
 	key_type = SKK_RSA;
-
-	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
 
 	print_info("byte_key_size = %d, flen = %d, padding = %d\n",
 		rsa_key_len, flen, padding);
@@ -250,20 +314,61 @@ static int secure_obj_rsa_priv_dec(int flen, const unsigned char *from,
 	attrs[2].value = (void *)&key_index;
 	attrs[2].valueLen = sizeof(uint32_t);
 
-	sk_ret = SK_EnumerateObjects(attrs, 3, &hObject, 1, &objCount);
+	sk_ret = SK_EnumerateObjects(attrs, 3, temp_hObject, MAX_SEC_OBJECTS, &objCount);
 	if (sk_ret != SKR_OK) {
 		print_error("SK_EnumerateObjects failed with code = 0x%x\n", sk_ret);
 		ret = -1;
+		memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
 		goto failure;
 	}
 
+	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
 	if (objCount == 0) {
 		print_error("No object found\n");
 		ret = -1;
 		goto failure;
 	}
 
-	print_info("SK_OBJECT_HANDLE = %u\n", hObject);
+	for (i = 0; i < objCount; i++) {
+		memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
+		attrs[0].type = SK_ATTR_MODULUS;
+		attrs[0].value = NULL;
+		attrs[0].valueLen = 0;
+
+		sk_ret = SK_GetObjectAttribute(temp_hObject[i], attrs, 1);
+		if (sk_ret != SKR_OK) {
+			print_error("SK_GetObjectAttribute failed for object %u with code = 0x%x\n",
+				temp_hObject[i], sk_ret);
+			continue;
+		}
+
+		if ((int16_t)(attrs[0].valueLen) != -1) {
+			attrs[0].value =
+				(void *)malloc(attrs[0].valueLen);
+			if (!attrs[0].value) {
+				print_error("malloc failed ATTR[%d].Value\n", i);
+				goto failure;
+			}
+		}
+
+		sk_ret = SK_GetObjectAttribute(temp_hObject[i], attrs, 1);
+		if (sk_ret != SKR_OK) {
+			print_error("SK_GetObjectAttribute failed for object %u with code = 0x%x\n",
+				temp_hObject[i], sk_ret);
+			continue;
+		}
+
+		if (!memcmp(attrs[0].value, modulus, rsa_key_len)) {
+			hObject = temp_hObject[i];
+			break;
+		}
+	}
+
+	if (hObject == 0xFFFF) {
+		print_error("Key Correponding to pem passed is not present in HSM\n");
+		ret = -1;
+		goto failure;
+	}
 
 	padded_to = (uint8_t *)malloc(rsa_key_len);
 	if (padded_to == NULL) {
@@ -306,8 +411,15 @@ static int secure_obj_rsa_priv_dec(int flen, const unsigned char *from,
 failure:
 	if (padded_to)
 		free(padded_to);
+	if (modulus)
+		free(modulus);
 	if (priv_exp)
 		free(priv_exp);
+
+	for (i = 0; i < 3; i++) {
+		if (attrs[i].value)
+			free(attrs[i].value);
+	}
 
 	if (ret == -2) {
 		const RSA_METHOD *rsa_meth = RSA_PKCS1_SSLeay();
@@ -315,12 +427,6 @@ failure:
 	}
 
 	return ret;
-}
-
-static void secure_obj_crypto_ex_free(void *obj, void *item,
-	CRYPTO_EX_DATA *ad, int idx, long argl, void *argp)
-{
-	free(item);
 }
 
 static int bind(ENGINE *engine, const char *id)
@@ -355,11 +461,6 @@ static int bind(ENGINE *engine, const char *id)
 		print_error("ENGINE_set_RSA failed\n");
 		goto end;
 	}
-
-	rsa_crypto_ex_data_index = RSA_get_ex_new_index(0, "Secure Object OpenSSL Engine",
-		NULL, NULL, secure_obj_crypto_ex_free);
-	if (rsa_crypto_ex_data_index == -1)
-		print_error("RSA_get_ex_new_index failed\n");
 
 	if (!ENGINE_set_default_RSA(engine)) {
 		print_error("ENGINE_set_default_RSA failed\n");
