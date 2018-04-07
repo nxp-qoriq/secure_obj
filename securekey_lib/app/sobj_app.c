@@ -287,14 +287,14 @@ unsigned char *copy_bio_data(BIO *out, int *data_lenp)
 char *generate_fake_private_RSA_key (int key_size, uint32_t obj_id,
 	void *pub_exp, uint16_t pub_exp_len, void *modulus, uint16_t modulus_len)
 {
-	char *key_data = NULL, *priv_key_exp_temp;
-	uint32_t *priv_key_exp, priv_key_len  = 0;
+	char *key_data = NULL, *priv_key_exp_temp = NULL;
+	uint32_t *priv_key_exp = NULL, priv_key_len  = 0;
 	int i = 0, j = 0;
 
 	RSA *rsa = RSA_new();
 	if (!rsa) {
-		goto end;
 		printf("RSA_new failed\n");
+		goto end;
 	}
 
 	BIGNUM *bn = BN_new();
