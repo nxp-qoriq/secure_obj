@@ -120,7 +120,6 @@ SK_OBJECT_TYPE getMechTypeFrmObjKeyT(SK_OBJECT_TYPE obj_type,
 int validate_key_len(uint32_t key_len)
 {
 	switch (key_len) {
-	case 512:
 	case 1024:
 	case 2048:
 		return key_len;

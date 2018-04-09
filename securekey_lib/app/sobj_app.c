@@ -680,32 +680,34 @@ void print_usage(void)
 	printf("\t -A - Attributes of the Object\n");
 	printf("\t -L - List Object\n");
 	printf("\t -R - Remove/Erase Object\n\n");
-	printf("\t Use bellow Sub options along with Main options:-\n");
+	printf("\t Use below Sub options along with Main options:-\n");
 	printf("\t\t -o - Object Type (Eg: pair, pub etc.)\n");
 	printf("\t\t -k - Key Type (Eg: rsa, ec etc.)\n");
-	printf("\t\t -s - Key Size/Length (Supported: 512, 1024, 2048).\n");
+	printf("\t\t -s - Key Size/Length (Supported: 1024, 2048).\n");
 	printf("\t\t -f - File Name (.pem) (Private Key).\n");
 	printf("\t\t -l - Object Label\n");
 	printf("\t\t -i - Object Id. (In Decimal)\n");
 	printf("\t\t -h - Object Handle (In Decimal)\n");
 	printf("\t\t -n - Number of Objects (Default = 5)\n");
-	printf("\t\t -m - Mechanism Id (Eg. rsa-pair, etc.)\n\n");
+	printf("\t\t -m - Mechanism Id (Eg. rsa-pair, etc.)\n");
+	printf("\t\t -w - Fake .pem file.(Optional command while generating key-pair)\n\n");
 	printf("\tUsage:\n");
 	printf("\t\tCreation:\n");
-	printf("\t\t./sobj_app -C -f <private.pem> -k <key-type> -o <obj-type> -s <key-size> -l <obj-label> -i <obj-ID>\n");
-	printf("\t\t./sobj_app -C -f sk_private.pem -k rsa -o pair -s 2048 -l \"Device_Key\" -i 1\n\n");
+	printf("\t\tsobj_app -C -f <private.pem> -k <key-type> -o <obj-type> -s <key-size> -l <obj-label> -i <obj-ID>\n");
+	printf("\t\tsobj_app -C -f sk_private.pem -k rsa -o pair -s 2048 -l \"Device_Key\" -i 1\n\n");
 	printf("\t\tGeneration:\n");
-	printf("\t\t./sobj_app -G -m <mechanism-ID> -s <key-size> -l <key-label> -i <key-ID>\n");
-	printf("\t\t./sobj_app -G -m rsa-pair -s 2048 -l \"Device_Key\" -i 1\n\n");
+	printf("\t\tsobj_app -G -m <mechanism-ID> -s <key-size> -l <key-label> -i <key-ID> [-w <file.pem>]\n");
+	printf("\t\tsobj_app -G -m rsa-pair -s 2048 -l \"Device_Key\" -i 1\n");
+	printf("\t\tsobj_app -G -m rsa-pair -s 2048 -l \"Device_Key\" -i 1 -w dev_key.pem\n\n");
 	printf("\t\tAttributes:\n");
-	printf("\t\t./sobj_app -A -h <obj-handle>\n");
-	printf("\t\t./sobj_app -A -h 1\n\n");
+	printf("\t\tsobj_app -A -h <obj-handle>\n");
+	printf("\t\tsobj_app -A -h 1\n\n");
 	printf("\t\tList:\n");
-	printf("\t\t./sobj_app -L [-n <num-of-obj> -k <key-type> -l <obj-label> -s <key-size> -i <obj-id>]\n");
+	printf("\t\tsobj_app -L [-n <num-of-obj> -k <key-type> -l <obj-label> -s <key-size> -i <obj-id>]\n");
 	printf("\t\t Objects can be listed based on combination of any above criteria.\n\n");
 	printf("\t\tRemove\n");
-	printf("\t\t./sobj_app -R -h <obj-handle>\n");
-	printf("\t\t./sobj_app -R -h 1\n\n");
+	printf("\t\tsobj_app -R -h <obj-handle>\n");
+	printf("\t\tsobj_app -R -h 1\n\n");
 }
 
 int process_sub_option(int option, char *optarg, struct getOptValue *getOptVal)
