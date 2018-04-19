@@ -196,75 +196,6 @@ static void populate_attrs(SK_ATTRIBUTE *attrs, void *key, struct getOptValue *g
 	}
 }
 
-static int do_CreateObject(struct getOptValue *getOptVal)
-{
-	int ret = APP_OK;
-	SK_ATTRIBUTE *attrs = NULL;
-	uint16_t attrCount = 0;
-	SK_OBJECT_HANDLE hObject;
-	rsa_3form_key_t rsa_3form_key;
-
-	switch (getOptVal->key_type) {
-	case SKK_RSA:
-		rsa_3form_key.rsa_modulus =
-			(uint8_t *) malloc(5*((getOptVal->key_len + 7) >> 3));
-		if (!rsa_3form_key.rsa_modulus) {
-			printf("Failure in allocating memory.\n");
-			ret = APP_MALLOC_FAIL;
-			goto cleanup;
-		}
-		rsa_3form_key.rsa_pub_exp = rsa_3form_key.rsa_modulus + ((getOptVal->key_len + 7) >> 3);
-		rsa_3form_key.rsa_priv_exp = rsa_3form_key.rsa_pub_exp + sizeof(RSA_F4);
-		rsa_3form_key.rsa_prime1 = rsa_3form_key.rsa_priv_exp + ((getOptVal->key_len + 7) >> 3);
-		rsa_3form_key.rsa_prime2 = rsa_3form_key.rsa_prime1 + ((getOptVal->key_len + 7) >> 3)/2;
-		rsa_3form_key.rsa_exp1 = rsa_3form_key.rsa_prime2 + ((getOptVal->key_len + 7) >> 3)/2;
-		rsa_3form_key.rsa_exp2 = rsa_3form_key.rsa_exp1 + ((getOptVal->key_len + 7) >> 3)/2;
-		rsa_3form_key.rsa_coeff = rsa_3form_key.rsa_exp2 + ((getOptVal->key_len + 7) >> 3)/2;
-
-		ret = generate_rsa_key(&rsa_3form_key, getOptVal);
-		if (ret != APP_OK) {
-			printf("Failure Generating RSA Key.\n");
-			goto cleanup;
-		}
-		/*printRSA_key(&rsa_3form_key, getOptVal->key_len);*/
-
-		attrCount = MAX_RSA_ATTRIBUTES;
-		attrs = (SK_ATTRIBUTE *)malloc(sizeof(SK_ATTRIBUTE) * attrCount);
-		if (attrs == NULL) {
-			printf("malloc failed\n");
-			ret = APP_MALLOC_FAIL;
-			goto cleanup;
-		}
-
-		populate_attrs(attrs, &rsa_3form_key, getOptVal);
-		break;
-	default:
-		break;
-	}
-
-	ret = SK_CreateObject(attrs, attrCount, &hObject);
-	if (ret != SKR_OK) {
-		printf("SK_CreateObject failed wit err code = 0x%x\n", ret);
-		ret = APP_SKR_ERR;
-	} else {
-		ret = APP_OK;
-		printf("Object created successfully handle = %u\n", hObject);
-	}
-
-cleanup:
-	if (attrs)
-		free(attrs);
-	switch (getOptVal->key_type) {
-	case SKK_RSA:
-		if (rsa_3form_key.rsa_modulus)
-			free(rsa_3form_key.rsa_modulus);
-		break;
-	default:
-		break;
-	}
-	return ret;
-}
-
 unsigned char *copy_bio_data(BIO *out, int *data_lenp)
 {
 	unsigned char *data, *tdata;
@@ -377,6 +308,159 @@ end:
 	if (priv_key_exp)
 		free(priv_key_exp);
 	return (key_data);
+}
+
+
+static int do_CreateObject(struct getOptValue *getOptVal)
+{
+	int ret = APP_OK, i = 0;;
+	SK_ATTRIBUTE *attrs = NULL;
+	SK_RET_CODE sk_ret;
+	uint16_t attrCount = 0;
+	SK_OBJECT_HANDLE hObject;
+	rsa_3form_key_t rsa_3form_key;
+	uint32_t obj_id;
+	FILE *fptr = NULL;
+	char *key_data = NULL, *file_name = NULL;
+
+	switch (getOptVal->key_type) {
+	case SKK_RSA:
+		rsa_3form_key.rsa_modulus =
+			(uint8_t *) malloc(5*((getOptVal->key_len + 7) >> 3));
+		if (!rsa_3form_key.rsa_modulus) {
+			printf("Failure in allocating memory.\n");
+			ret = APP_MALLOC_FAIL;
+			goto cleanup;
+		}
+		rsa_3form_key.rsa_pub_exp = rsa_3form_key.rsa_modulus + ((getOptVal->key_len + 7) >> 3);
+		rsa_3form_key.rsa_priv_exp = rsa_3form_key.rsa_pub_exp + sizeof(RSA_F4);
+		rsa_3form_key.rsa_prime1 = rsa_3form_key.rsa_priv_exp + ((getOptVal->key_len + 7) >> 3);
+		rsa_3form_key.rsa_prime2 = rsa_3form_key.rsa_prime1 + ((getOptVal->key_len + 7) >> 3)/2;
+		rsa_3form_key.rsa_exp1 = rsa_3form_key.rsa_prime2 + ((getOptVal->key_len + 7) >> 3)/2;
+		rsa_3form_key.rsa_exp2 = rsa_3form_key.rsa_exp1 + ((getOptVal->key_len + 7) >> 3)/2;
+		rsa_3form_key.rsa_coeff = rsa_3form_key.rsa_exp2 + ((getOptVal->key_len + 7) >> 3)/2;
+
+		ret = generate_rsa_key(&rsa_3form_key, getOptVal);
+		if (ret != APP_OK) {
+			printf("Failure Generating RSA Key.\n");
+			goto cleanup;
+		}
+		/*printRSA_key(&rsa_3form_key, getOptVal->key_len);*/
+
+		attrCount = MAX_RSA_ATTRIBUTES;
+		attrs = (SK_ATTRIBUTE *)malloc(sizeof(SK_ATTRIBUTE) * attrCount);
+		if (attrs == NULL) {
+			printf("malloc failed\n");
+			ret = APP_MALLOC_FAIL;
+			goto cleanup;
+		}
+
+		populate_attrs(attrs, &rsa_3form_key, getOptVal);
+		break;
+	default:
+		break;
+	}
+
+	ret = SK_CreateObject(attrs, attrCount, &hObject);
+	if (ret != SKR_OK) {
+		printf("SK_CreateObject failed wit err code = 0x%x\n", ret);
+		ret = APP_SKR_ERR;
+		goto cleanup;
+	} else {
+		ret = APP_OK;
+		printf("Object created successfully handle = %u\n", hObject);
+	}
+
+	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * MAX_RSA_ATTRIBUTES);
+
+	attrs[0].type = SK_ATTR_PUBLIC_EXPONENT;
+	attrs[0].value = NULL;
+	attrs[0].valueLen = 0;
+
+	attrs[1].type = SK_ATTR_MODULUS;
+	attrs[1].value = NULL;
+	attrs[1].valueLen = 0;
+
+	sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+	if (sk_ret != SKR_OK) {
+		if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
+			printf("\nObject Handle[%d] not found.\n", hObject);
+		else
+			printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
+
+		ret = APP_SKR_ERR;
+		goto cleanup;
+	}
+
+	ret = APP_OK;
+	for (i = 0; i < 2; i++) {
+		if ((int16_t)(attrs[i].valueLen) != -1) {
+			attrs[i].value =
+				(void *)malloc(attrs[i].valueLen);
+
+			if (!attrs[i].value) {
+				printf("malloc failed ATTR[%d].Value\n", i);
+				ret = APP_MALLOC_FAIL;
+				goto cleanup;
+			}
+		}
+	}
+
+	sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+	if (sk_ret != SKR_OK) {
+		printf("Failed to Get Attribute Values.\n");
+		ret = APP_SKR_ERR;
+		goto cleanup;
+	}
+
+	/* Here we are generating a fake .pem file for satisfying
+	kubernetes/puppet use case */
+	 if (getOptVal->write_to_file) {
+		obj_id = getOptVal->obj_id;
+		file_name = getOptVal->write_to_file;
+
+		key_data = generate_fake_private_RSA_key(getOptVal->key_len, obj_id,
+			attrs[0].value, attrs[0].valueLen,
+			attrs[1].value, attrs[1].valueLen);
+		if (!key_data) {
+			printf("generate_fake_private_RSA_key failed \n");
+			ret = APP_SKR_ERR;
+			goto cleanup;
+		}
+
+		fptr = fopen(file_name, "wb");
+		if (fptr == NULL) {
+			printf("File does not exists\n");
+			ret = APP_SKR_ERR;
+			goto cleanup;
+		}
+		fwrite(key_data, sizeof(char), strlen(key_data), fptr);
+	}
+
+cleanup:
+	if (attrs) {
+		for (i = 0; i < 2; i++) {
+			if (attrs[i].value)
+				free(attrs[i].value);
+		}
+		free(attrs);
+	}
+
+	switch (getOptVal->key_type) {
+	case SKK_RSA:
+		if (rsa_3form_key.rsa_modulus)
+			free(rsa_3form_key.rsa_modulus);
+		break;
+	default:
+		break;
+	}
+
+	if (key_data)
+		free(key_data);
+	if (fptr)
+		fclose(fptr);
+
+	return ret;
 }
 
 static int do_GenerateKeyPair(struct getOptValue *getOptVal)
@@ -693,8 +777,9 @@ void print_usage(void)
 	printf("\t\t -w - Fake .pem file.(Optional command while generating key-pair)\n\n");
 	printf("\tUsage:\n");
 	printf("\t\tCreation:\n");
-	printf("\t\tsobj_app -C -f <private.pem> -k <key-type> -o <obj-type> -s <key-size> -l <obj-label> -i <obj-ID>\n");
-	printf("\t\tsobj_app -C -f sk_private.pem -k rsa -o pair -s 2048 -l \"Device_Key\" -i 1\n\n");
+	printf("\t\tsobj_app -C -f <private.pem> -k <key-type> -o <obj-type> -s <key-size> -l <obj-label> -i <obj-ID> [-w <file.pem>]\n");
+	printf("\t\tsobj_app -C -f sk_private.pem -k rsa -o pair -s 2048 -l \"Device_Key\" -i 1\n");
+	printf("\t\tsobj_app -C -f sk_private.pem -k rsa -o pair -s 2048 -l \"Device_Key\" -i 1 -w dev_key.pem\n\n");
 	printf("\t\tGeneration:\n");
 	printf("\t\tsobj_app -G -m <mechanism-ID> -s <key-size> -l <key-label> -i <key-ID> [-w <file.pem>]\n");
 	printf("\t\tsobj_app -G -m rsa-pair -s 2048 -l \"Device_Key\" -i 1\n");
