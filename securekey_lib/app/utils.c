@@ -87,6 +87,8 @@ SK_KEY_TYPE getKeyType(char *keyTypeStr)
 		return U32_INVALID;
 	else if (strcmp(keyTypeStr, "rsa") == 0)
 		return SKK_RSA;
+	else if (strcmp(keyTypeStr, "ec") == 0)
+		return SKK_EC;
 
 	printf("Unsupported Key Type: %s\n", keyTypeStr);
 	return U32_INVALID;
@@ -98,6 +100,8 @@ SK_OBJECT_TYPE getMechType(char *mechTypeStr)
 		return U32_INVALID;
 	else if (strcmp(mechTypeStr, "rsa-pair") == 0)
 		return SKM_RSA_PKCS_KEY_PAIR_GEN;
+	else if (strcmp(mechTypeStr, "ec-pair") == 0)
+		return SKM_EC_PKCS_KEY_PAIR_GEN;
 
 	printf("Unsupported Mechanism Type: %s\n", mechTypeStr);
 	return U32_INVALID;
@@ -120,11 +124,25 @@ SK_OBJECT_TYPE getMechTypeFrmObjKeyT(SK_OBJECT_TYPE obj_type,
 int validate_key_len(uint32_t key_len)
 {
 	switch (key_len) {
+	/* For RSA Keys */
 	case 1024:
 	case 2048:
 		return key_len;
 	default:
 		printf("Unsupported Key Length = %d\n", key_len);
+		return U32_INVALID;
+	}
+}
+
+int validate_ec_key_len(uint32_t key_len)
+{
+	int key_in_bits = key_len * 8;
+	switch (key_in_bits) {
+	case 256:
+	case 384:
+		return key_len;
+	default:
+		printf("Unsupported Key Length = %d\n", key_in_bits);
 		return U32_INVALID;
 	}
 }

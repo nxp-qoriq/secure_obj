@@ -1,7 +1,7 @@
 /*
-  * Copyright 2017 NXP
-  * SPDX-License-Identifier:     BSD-3-Clause
-*/
+ * Copyright 2017 NXP
+ * SPDX-License-Identifier:     BSD-3-Clause
+ */
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,8 +9,10 @@
 #include <stdint.h>
 #include <securekey_api.h>
 #include <openssl/pem.h>
+#include <openssl/ec.h>
 #include <unistd.h>
 #include "utils.h"
+#include "rsa_data.h"
 
 #define	SOBJ_KEY_ID	0xE1E2E3E4
 
@@ -30,7 +32,122 @@ struct getOptValue {
 	char *label;
 	int findCritCount;
 	char *write_to_file;
+	char *curve;
 };
+
+int import_ec_key(char *ec_file, ec_key_t **ec_key_ret)
+{
+	EVP_PKEY *ec_evp_pkey;
+	EC_KEY *eckey;
+	const EC_POINT *ec_pub_key;
+	const BIGNUM *ec_priv_key;
+	BIGNUM *bn_order = BN_new();
+	ASN1_OBJECT *asn1_obj;
+	const EC_GROUP *ec_group;
+	ec_key_t *ec_key_st;
+	int ec_key_len, ec_priv_len;
+	const char *sname;
+	char *pubkey_oct;
+	int curve_nid = 0;
+	int total_len, pubkey_oct_len, octet_len;
+
+	FILE *fptr;
+	int ret = APP_OK;
+
+	fptr = fopen(ec_file, "rb");
+	if (!fptr) {
+		printf("Failure Opening Key File.\n");
+		ret = APP_PEM_READ_ERROR;
+		goto cleanup;
+	}
+
+	ec_evp_pkey = PEM_read_PrivateKey(fptr, NULL, NULL, NULL);
+	if (ec_evp_pkey == NULL) {
+		printf("Key with Label %s not found.\n", ec_file);
+		ret = APP_PEM_READ_ERROR;
+		goto cleanup;
+	}
+
+	eckey = EVP_PKEY_get1_EC_KEY(ec_evp_pkey);
+	if (!eckey) {
+		ret = APP_OPSSL_ERR;
+		goto cleanup;
+	}
+
+	ec_priv_key = EC_KEY_get0_private_key(eckey);
+	if (!ec_priv_key) {
+		ret = APP_OPSSL_ERR;
+		goto cleanup;
+	}
+
+	ec_pub_key = EC_KEY_get0_public_key(eckey);
+	if (!ec_pub_key) {
+		ret = APP_OPSSL_ERR;
+		goto cleanup;
+	}
+
+	ec_group = EC_KEY_get0_group(eckey);
+	if (!ec_group) {
+		ret = APP_OPSSL_ERR;
+		goto cleanup;
+	}
+
+	curve_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(eckey));
+	asn1_obj = OBJ_nid2obj(curve_nid);
+	sname = OBJ_nid2sn(curve_nid);
+
+	EC_GROUP_get_order(ec_group, bn_order, NULL);
+	ec_key_len = BN_num_bytes(bn_order);
+	if (validate_ec_key_len(ec_key_len) == U32_INVALID) {
+		ret = APP_SKR_ERR;
+		goto cleanup;
+	}
+
+	pubkey_oct_len = (2 * ec_key_len) + 1;
+
+	pubkey_oct = malloc(pubkey_oct_len);
+	if (!pubkey_oct) {
+		ret = APP_MALLOC_FAIL;
+		goto cleanup;
+	}
+
+	octet_len = EC_POINT_point2oct(ec_group, ec_pub_key,
+		POINT_CONVERSION_UNCOMPRESSED, pubkey_oct,
+		pubkey_oct_len, NULL);
+	if (pubkey_oct_len != octet_len) {
+		ret = APP_PEM_READ_ERROR;
+		goto cleanup;
+	}
+
+	ec_priv_len = BN_num_bytes(ec_priv_key);
+	total_len = octet_len + ec_priv_len + strlen(sname);
+	ec_key_st = malloc(total_len + sizeof(ec_key_t));
+	if (!ec_key_st) {
+		ret = APP_MALLOC_FAIL;
+		goto cleanup;
+	}
+
+	ec_key_st->params = (uint8_t *)ec_key_st + (sizeof(ec_key_t));
+	ec_key_st->params_len = strlen(sname);
+	ec_key_st->public_point = (uint8_t *)ec_key_st->params + ec_key_st->params_len;
+	ec_key_st->public_point_len = octet_len;
+	ec_key_st->priv_value = (uint8_t *)ec_key_st->public_point + ec_key_st->public_point_len;
+	ec_key_st->priv_value_len = ec_priv_len;
+
+	memcpy(ec_key_st->params, sname, strlen(sname));
+	memcpy(ec_key_st->public_point, pubkey_oct, ec_key_st->public_point_len);
+	BN_bn2bin(ec_priv_key, ec_key_st->priv_value);
+
+	*ec_key_ret = ec_key_st;
+
+cleanup:
+	if (pubkey_oct)
+		free(pubkey_oct);
+	if (fptr)
+		fclose(fptr);
+
+	return ret;
+}
 
 int generate_rsa_key(rsa_3form_key_t *rsa_3form_key, struct getOptValue *getOptVal)
 {
@@ -75,13 +192,13 @@ int generate_rsa_key(rsa_3form_key_t *rsa_3form_key, struct getOptValue *getOptV
 		bne = BN_new();
 		ret = BN_set_word(bne, e);
 		if (ret != 1) {
-			ret = APP_OPSSL_KEY_GEN_ERR;
+			ret = APP_OPSSL_ERR;
 			goto cleanup;
 		}
 		ret = APP_OK;
 		ret = RSA_generate_key_ex(rsa, bits, bne, NULL);
 		if (ret != 1) {
-			ret = APP_OPSSL_KEY_GEN_ERR;
+			ret = APP_OPSSL_ERR;
 			goto cleanup;
 		}
 		ret = APP_OK;
@@ -89,7 +206,7 @@ int generate_rsa_key(rsa_3form_key_t *rsa_3form_key, struct getOptValue *getOptV
 		ret = PEM_write_bio_RSAPublicKey(bp_public, rsa);
 		if (ret != 1) {
 			printf("Creating Public Key Pem file Failed.\n");
-			ret = APP_OPSSL_KEY_GEN_ERR;
+			ret = APP_OPSSL_ERR;
 			goto cleanup;
 		}
 
@@ -98,7 +215,7 @@ int generate_rsa_key(rsa_3form_key_t *rsa_3form_key, struct getOptValue *getOptV
 		ret = PEM_write_bio_RSAPrivateKey(bp_private, rsa, NULL, NULL, 0, NULL, NULL);
 		if (ret != 1) {
 			printf("Creating Private Key Pem file Failed.\n");
-			ret = APP_OPSSL_KEY_GEN_ERR;
+			ret = APP_OPSSL_ERR;
 			goto cleanup;
 		}
 		ret = APP_OK;
@@ -132,6 +249,7 @@ cleanup:
 static void populate_attrs(SK_ATTRIBUTE *attrs, void *key, struct getOptValue *getOptVal)
 {
 	rsa_3form_key_t *rsa_3form_key;
+	ec_key_t *ec_key;
 
 	attrs[0].type = SK_ATTR_OBJECT_TYPE;
 	attrs[0].value = &(getOptVal->obj_type);
@@ -149,50 +267,64 @@ static void populate_attrs(SK_ATTRIBUTE *attrs, void *key, struct getOptValue *g
 	attrs[3].value = getOptVal->label;
 	attrs[3].valueLen = strlen(getOptVal->label);
 
-	attrs[4].type = SK_ATTR_MODULUS_BITS;
-	attrs[4].value = &(getOptVal->key_len);
-	attrs[4].valueLen = sizeof(uint32_t);
-
 	switch (getOptVal->key_type) {
+		case SKK_RSA:
+			rsa_3form_key = (rsa_3form_key_t *) key;
 
-	case SKK_RSA:
-		rsa_3form_key = (rsa_3form_key_t *) key;
+			attrs[4].type = SK_ATTR_MODULUS_BITS;
+			attrs[4].value = &(getOptVal->key_len);
+			attrs[4].valueLen = sizeof(uint32_t);
 
-		attrs[5].type = SK_ATTR_MODULUS;
-		attrs[5].value = (void *)(rsa_3form_key->rsa_modulus);
-		attrs[5].valueLen = ((getOptVal->key_len + 7) >> 3);
+			attrs[5].type = SK_ATTR_MODULUS;
+			attrs[5].value = (void *)(rsa_3form_key->rsa_modulus);
+			attrs[5].valueLen = ((getOptVal->key_len + 7) >> 3);
 
-		attrs[6].type = SK_ATTR_PUBLIC_EXPONENT;
-		attrs[6].value = (void *)(rsa_3form_key->rsa_pub_exp);
-		attrs[6].valueLen = 3;
+			attrs[6].type = SK_ATTR_PUBLIC_EXPONENT;
+			attrs[6].value = (void *)(rsa_3form_key->rsa_pub_exp);
+			attrs[6].valueLen = 3;
 
-		attrs[7].type = SK_ATTR_PRIVATE_EXPONENT;
-		attrs[7].value = (void *)(rsa_3form_key->rsa_priv_exp);
-		attrs[7].valueLen = ((getOptVal->key_len + 7) >> 3);
+			attrs[7].type = SK_ATTR_PRIVATE_EXPONENT;
+			attrs[7].value = (void *)(rsa_3form_key->rsa_priv_exp);
+			attrs[7].valueLen = ((getOptVal->key_len + 7) >> 3);
 
-		attrs[8].type = SK_ATTR_PRIME_1;
-		attrs[8].value = (void *)(rsa_3form_key->rsa_prime1);
-		attrs[8].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attrs[8].type = SK_ATTR_PRIME_1;
+			attrs[8].value = (void *)(rsa_3form_key->rsa_prime1);
+			attrs[8].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
 
-		attrs[9].type = SK_ATTR_PRIME_2;
-		attrs[9].value = (void *)(rsa_3form_key->rsa_prime2);
-		attrs[9].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attrs[9].type = SK_ATTR_PRIME_2;
+			attrs[9].value = (void *)(rsa_3form_key->rsa_prime2);
+			attrs[9].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
 
-		attrs[10].type = SK_ATTR_EXPONENT_1;
-		attrs[10].value = (void *)(rsa_3form_key->rsa_exp1);
-		attrs[10].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attrs[10].type = SK_ATTR_EXPONENT_1;
+			attrs[10].value = (void *)(rsa_3form_key->rsa_exp1);
+			attrs[10].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
 
-		attrs[11].type = SK_ATTR_EXPONENT_2;
-		attrs[11].value = (void *)(rsa_3form_key->rsa_exp2);
-		attrs[11].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attrs[11].type = SK_ATTR_EXPONENT_2;
+			attrs[11].value = (void *)(rsa_3form_key->rsa_exp2);
+			attrs[11].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
 
-		attrs[12].type = SK_ATTR_COEFFICIENT;
-		attrs[12].value = (void *)(rsa_3form_key->rsa_coeff);
-		attrs[12].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
-		break;
-	default:
-		printf("Un-Supported Key Format\n");
-		break;
+			attrs[12].type = SK_ATTR_COEFFICIENT;
+			attrs[12].value = (void *)(rsa_3form_key->rsa_coeff);
+			attrs[12].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			break;
+		case SKK_EC:
+			ec_key = (ec_key_t *)key;;
+			attrs[4].type = SK_ATTR_PARAMS;
+			attrs[4].value = ec_key->params;
+			attrs[4].valueLen = ec_key->params_len;
+
+			attrs[5].type = SK_ATTR_POINT;
+			attrs[5].value = ec_key->public_point;
+			attrs[5].valueLen = ec_key->public_point_len;
+
+			attrs[6].type = SK_ATTR_PRIV_VALUE;
+			attrs[6].value = ec_key->priv_value;
+			attrs[6].valueLen = ec_key->priv_value_len;
+
+			break;
+		default:
+			printf("Un-Supported Key Format\n");
+			break;
 	}
 }
 
@@ -216,7 +348,7 @@ unsigned char *copy_bio_data(BIO *out, int *data_lenp)
 }
 
 char *generate_fake_private_RSA_key (int key_size, uint32_t obj_id,
-	void *pub_exp, uint16_t pub_exp_len, void *modulus, uint16_t modulus_len)
+		void *pub_exp, uint16_t pub_exp_len, void *modulus, uint16_t modulus_len)
 {
 	char *key_data = NULL, *priv_key_exp_temp = NULL;
 	uint32_t *priv_key_exp = NULL, priv_key_len  = 0;
@@ -272,7 +404,7 @@ char *generate_fake_private_RSA_key (int key_size, uint32_t obj_id,
 	for (j=0; j<2; j++) {
 		for (i=5; i<9; i++) {
 			priv_key_exp_temp[priv_key_len-i-(j*4)] = (uint8_t)(SOBJ_KEY_ID>> 8*(i-5));
-                        }
+		}
 	}
 
 #if 0
@@ -318,47 +450,72 @@ static int do_CreateObject(struct getOptValue *getOptVal)
 	SK_RET_CODE sk_ret;
 	uint16_t attrCount = 0;
 	SK_OBJECT_HANDLE hObject;
-	rsa_3form_key_t rsa_3form_key;
 	uint32_t obj_id;
 	FILE *fptr = NULL;
 	char *key_data = NULL, *file_name = NULL;
+	rsa_3form_key_t rsa_3form_key;
+	ec_key_t *ec_key;
 
 	switch (getOptVal->key_type) {
-	case SKK_RSA:
-		rsa_3form_key.rsa_modulus =
-			(uint8_t *) malloc(5*((getOptVal->key_len + 7) >> 3));
-		if (!rsa_3form_key.rsa_modulus) {
-			printf("Failure in allocating memory.\n");
-			ret = APP_MALLOC_FAIL;
-			goto cleanup;
-		}
-		rsa_3form_key.rsa_pub_exp = rsa_3form_key.rsa_modulus + ((getOptVal->key_len + 7) >> 3);
-		rsa_3form_key.rsa_priv_exp = rsa_3form_key.rsa_pub_exp + sizeof(RSA_F4);
-		rsa_3form_key.rsa_prime1 = rsa_3form_key.rsa_priv_exp + ((getOptVal->key_len + 7) >> 3);
-		rsa_3form_key.rsa_prime2 = rsa_3form_key.rsa_prime1 + ((getOptVal->key_len + 7) >> 3)/2;
-		rsa_3form_key.rsa_exp1 = rsa_3form_key.rsa_prime2 + ((getOptVal->key_len + 7) >> 3)/2;
-		rsa_3form_key.rsa_exp2 = rsa_3form_key.rsa_exp1 + ((getOptVal->key_len + 7) >> 3)/2;
-		rsa_3form_key.rsa_coeff = rsa_3form_key.rsa_exp2 + ((getOptVal->key_len + 7) >> 3)/2;
+		case SKK_RSA:
+			rsa_3form_key.rsa_modulus =
+				(uint8_t *) malloc(5*((getOptVal->key_len + 7) >> 3));
+			if (!rsa_3form_key.rsa_modulus) {
+				printf("Failure in allocating memory.\n");
+				ret = APP_MALLOC_FAIL;
+				goto cleanup;
+			}
 
-		ret = generate_rsa_key(&rsa_3form_key, getOptVal);
-		if (ret != APP_OK) {
-			printf("Failure Generating RSA Key.\n");
-			goto cleanup;
-		}
-		/*printRSA_key(&rsa_3form_key, getOptVal->key_len);*/
+			rsa_3form_key.rsa_pub_exp = rsa_3form_key.rsa_modulus + ((getOptVal->key_len + 7) >> 3);
+			rsa_3form_key.rsa_priv_exp = rsa_3form_key.rsa_pub_exp + sizeof(RSA_F4);
+			rsa_3form_key.rsa_prime1 = rsa_3form_key.rsa_priv_exp + ((getOptVal->key_len + 7) >> 3);
+			rsa_3form_key.rsa_prime2 = rsa_3form_key.rsa_prime1 + ((getOptVal->key_len + 7) >> 3)/2;
+			rsa_3form_key.rsa_exp1 = rsa_3form_key.rsa_prime2 + ((getOptVal->key_len + 7) >> 3)/2;
+			rsa_3form_key.rsa_exp2 = rsa_3form_key.rsa_exp1 + ((getOptVal->key_len + 7) >> 3)/2;
+			rsa_3form_key.rsa_coeff = rsa_3form_key.rsa_exp2 + ((getOptVal->key_len + 7) >> 3)/2;
 
-		attrCount = MAX_RSA_ATTRIBUTES;
-		attrs = (SK_ATTRIBUTE *)malloc(sizeof(SK_ATTRIBUTE) * attrCount);
-		if (attrs == NULL) {
-			printf("malloc failed\n");
-			ret = APP_MALLOC_FAIL;
-			goto cleanup;
-		}
+			ret = generate_rsa_key(&rsa_3form_key, getOptVal);
+			if (ret != APP_OK) {
+				printf("Failure Generating RSA Key.\n");
+				goto cleanup;
+			}
+			/*printRSA_key(&rsa_3form_key, getOptVal->key_len);*/
 
-		populate_attrs(attrs, &rsa_3form_key, getOptVal);
-		break;
-	default:
-		break;
+			attrCount = MAX_RSA_ATTRIBUTES;
+			attrs = (SK_ATTRIBUTE *)malloc(sizeof(SK_ATTRIBUTE) * attrCount);
+			if (attrs == NULL) {
+				printf("malloc failed\n");
+				ret = APP_MALLOC_FAIL;
+				goto cleanup;
+			}
+
+			populate_attrs(attrs, &rsa_3form_key, getOptVal);
+			break;
+		case SKK_EC:
+			if (getOptVal->importPrvFile) {
+				ret = import_ec_key(getOptVal->importPrvFile, &ec_key);
+				if (ret != APP_OK) {
+					printf("Failure Generating RSA Key.\n");
+					goto cleanup;
+				}
+
+				attrCount = MAX_EC_ATTRIBUTES;
+				attrs = (SK_ATTRIBUTE *)malloc(sizeof(SK_ATTRIBUTE) * attrCount);
+				if (attrs == NULL) {
+					printf("malloc failed\n");
+					ret = APP_MALLOC_FAIL;
+					goto cleanup;
+				}
+
+				populate_attrs(attrs, ec_key, getOptVal);
+			} else {
+				ret = APP_PEM_READ_ERROR;
+				goto cleanup;
+			}
+			break;
+		default:
+			goto cleanup;
+			break;
 	}
 
 	ret = SK_CreateObject(attrs, attrCount, &hObject);
@@ -371,70 +528,80 @@ static int do_CreateObject(struct getOptValue *getOptVal)
 		printf("Object created successfully handle = %u\n", hObject);
 	}
 
-	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * MAX_RSA_ATTRIBUTES);
+	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * attrCount);
 
-	attrs[0].type = SK_ATTR_PUBLIC_EXPONENT;
-	attrs[0].value = NULL;
-	attrs[0].valueLen = 0;
+	if (getOptVal->write_to_file) {
+		switch (getOptVal->key_type) {
+			case SKK_RSA:
+				attrs[0].type = SK_ATTR_PUBLIC_EXPONENT;
+				attrs[0].value = NULL;
+				attrs[0].valueLen = 0;
 
-	attrs[1].type = SK_ATTR_MODULUS;
-	attrs[1].value = NULL;
-	attrs[1].valueLen = 0;
+				attrs[1].type = SK_ATTR_MODULUS;
+				attrs[1].value = NULL;
+				attrs[1].valueLen = 0;
 
-	sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
-	if (sk_ret != SKR_OK) {
-		if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
-			printf("\nObject Handle[%d] not found.\n", hObject);
-		else
-			printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
+				sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+				if (sk_ret != SKR_OK) {
+					if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
+						printf("\nObject Handle[%d] not found.\n", hObject);
+					else
+						printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
 
-		ret = APP_SKR_ERR;
-		goto cleanup;
-	}
+					ret = APP_SKR_ERR;
+					goto cleanup;
+				}
 
-	ret = APP_OK;
-	for (i = 0; i < 2; i++) {
-		if ((int16_t)(attrs[i].valueLen) != -1) {
-			attrs[i].value =
-				(void *)malloc(attrs[i].valueLen);
+				ret = APP_OK;
+				for (i = 0; i < 2; i++) {
+					if ((int16_t)(attrs[i].valueLen) != -1) {
+						attrs[i].value =
+							(void *)malloc(attrs[i].valueLen);
 
-			if (!attrs[i].value) {
-				printf("malloc failed ATTR[%d].Value\n", i);
-				ret = APP_MALLOC_FAIL;
-				goto cleanup;
-			}
+						if (!attrs[i].value) {
+							printf("malloc failed ATTR[%d].Value\n", i);
+							ret = APP_MALLOC_FAIL;
+							goto cleanup;
+						}
+					}
+				}
+
+				sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+				if (sk_ret != SKR_OK) {
+					printf("Failed to Get Attribute Values.\n");
+					ret = APP_SKR_ERR;
+					goto cleanup;
+				}
+
+				/* Here we are generating a fake .pem file for satisfying
+				   kubernetes/puppet use case */
+
+				obj_id = getOptVal->obj_id;
+				file_name = getOptVal->write_to_file;
+
+				key_data = generate_fake_private_RSA_key(getOptVal->key_len, obj_id,
+						attrs[0].value, attrs[0].valueLen,
+						attrs[1].value, attrs[1].valueLen);
+				if (!key_data) {
+					printf("generate_fake_private_RSA_key failed \n");
+					ret = APP_SKR_ERR;
+					goto cleanup;
+				}
+
+				fptr = fopen(file_name, "wb");
+				if (fptr == NULL) {
+					printf("File does not exists\n");
+					ret = APP_SKR_ERR;
+					goto cleanup;
+				}
+				fwrite(key_data, sizeof(char), strlen(key_data), fptr);
+			break;
+			case SKK_EC:
+				printf("EC Writing not supported\n");
+				break;
+			default:
+				break;
 		}
-	}
-
-	sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
-	if (sk_ret != SKR_OK) {
-		printf("Failed to Get Attribute Values.\n");
-		ret = APP_SKR_ERR;
-		goto cleanup;
-	}
-
-	/* Here we are generating a fake .pem file for satisfying
-	kubernetes/puppet use case */
-	 if (getOptVal->write_to_file) {
-		obj_id = getOptVal->obj_id;
-		file_name = getOptVal->write_to_file;
-
-		key_data = generate_fake_private_RSA_key(getOptVal->key_len, obj_id,
-			attrs[0].value, attrs[0].valueLen,
-			attrs[1].value, attrs[1].valueLen);
-		if (!key_data) {
-			printf("generate_fake_private_RSA_key failed \n");
-			ret = APP_SKR_ERR;
-			goto cleanup;
-		}
-
-		fptr = fopen(file_name, "wb");
-		if (fptr == NULL) {
-			printf("File does not exists\n");
-			ret = APP_SKR_ERR;
-			goto cleanup;
-		}
-		fwrite(key_data, sizeof(char), strlen(key_data), fptr);
 	}
 
 cleanup:
@@ -443,16 +610,19 @@ cleanup:
 			if (attrs[i].value)
 				free(attrs[i].value);
 		}
-		free(attrs);
 	}
+	free(attrs);
 
 	switch (getOptVal->key_type) {
-	case SKK_RSA:
-		if (rsa_3form_key.rsa_modulus)
-			free(rsa_3form_key.rsa_modulus);
-		break;
-	default:
-		break;
+		case SKK_RSA:
+			if (rsa_3form_key.rsa_modulus)
+				free(rsa_3form_key.rsa_modulus);
+			break;
+		case SKK_EC:
+			if (ec_key)
+				free(ec_key);
+		default:
+			break;
 	}
 
 	if (key_data)
@@ -465,38 +635,67 @@ cleanup:
 
 static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 {
+#define	MAX_SK_ATTRS	4
 	int ret = APP_OK, i = 0;
 	SK_RET_CODE sk_ret;
-	SK_ATTRIBUTE attrs[4];
+	SK_ATTRIBUTE attrs[MAX_SK_ATTRS];
+	uint16_t attrCount = 0;
 	SK_OBJECT_HANDLE hObject;
 	SK_MECHANISM_INFO mechanismType = {0};
 	FILE *fptr = NULL;
 	char *label = NULL, *file_name = NULL;
 	char *key_data = NULL;
 	uint32_t obj_id;
-	static const uint8_t rsa_pub_exp[] = {
-		0x01, 0x00, 0x01
-	};
+	SK_KEY_TYPE key_type;
 
 	mechanismType.mechanism = getOptVal->mech_type;
 
-	attrs[0].type = SK_ATTR_OBJECT_INDEX;
-	attrs[0].value = &(getOptVal->obj_id);
-	attrs[0].valueLen = sizeof(uint32_t);
+	attrs[attrCount].type = SK_ATTR_OBJECT_INDEX;
+	attrs[attrCount].value = &(getOptVal->obj_id);
+	attrs[attrCount].valueLen = sizeof(uint32_t);
+	attrCount++;
 
-	attrs[1].type = SK_ATTR_OBJECT_LABEL;
-	attrs[1].value = getOptVal->label;
-	attrs[1].valueLen = strlen(getOptVal->label);
+	attrs[attrCount].type = SK_ATTR_OBJECT_LABEL;
+	attrs[attrCount].value = getOptVal->label;
+	attrs[attrCount].valueLen = strlen(getOptVal->label);
+	attrCount++;
 
-	attrs[2].type = SK_ATTR_MODULUS_BITS;
-	attrs[2].value = &(getOptVal->key_len);
-	attrs[2].valueLen = sizeof(uint32_t);
+	switch (mechanismType.mechanism) {
+		case SKM_RSA_PKCS_KEY_PAIR_GEN:
+			key_type = SKK_RSA;
+			attrs[attrCount].type = SK_ATTR_MODULUS_BITS;
+			attrs[attrCount].value = &(getOptVal->key_len);
+			attrs[attrCount].valueLen = sizeof(uint32_t);
+			attrCount++;
 
-	attrs[3].type = SK_ATTR_PUBLIC_EXPONENT;
-	attrs[3].value = (void *)rsa_pub_exp;
-	attrs[3].valueLen = sizeof(rsa_pub_exp);
+			attrs[attrCount].type = SK_ATTR_PUBLIC_EXPONENT;
+			attrs[attrCount].value = (void *)rsa_pub_exp;
+			attrs[attrCount].valueLen = sizeof(rsa_pub_exp);
+			attrCount++;
 
-	sk_ret = SK_GenerateKeyPair(&mechanismType, attrs, 4, &hObject);
+			break;
+
+		case SKM_EC_PKCS_KEY_PAIR_GEN:
+			key_type = SKK_EC;
+			if (strcmp(getOptVal->curve, "prime256v1")
+				&& strcmp(getOptVal->curve, "secp384r1")) {
+				printf("Invalid/Unsupported Curve.\n");
+				memset(attrs, 0, sizeof(SK_ATTRIBUTE) * attrCount);
+				ret = APP_IP_ERR;
+				goto end;
+			}
+
+			attrs[attrCount].type = SK_ATTR_PARAMS;
+			attrs[attrCount].value = getOptVal->curve;
+			attrs[attrCount].valueLen = sizeof(getOptVal->curve);
+			attrCount++;
+			break;
+		default:
+			ret = APP_IP_ERR;
+			goto end;
+	}
+
+	sk_ret = SK_GenerateKeyPair(&mechanismType, attrs, attrCount, &hObject);
 	if (sk_ret != SKR_OK) {
 		printf("SK_GenerateKeyPair failed wit err code = 0x%x\n", sk_ret);
 		ret = APP_SKR_ERR;
@@ -506,74 +705,83 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 		printf("Object generated successfully handle = %u\n", hObject);
 	}
 
-	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * 4);
-
-	attrs[0].type = SK_ATTR_PUBLIC_EXPONENT;
-	attrs[0].value = NULL;
-	attrs[0].valueLen = 0;
-
-	attrs[1].type = SK_ATTR_MODULUS;
-	attrs[1].value = NULL;
-	attrs[1].valueLen = 0;
-
-	sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
-	if (sk_ret != SKR_OK) {
-		if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
-			printf("\nObject Handle[%d] not found.\n", hObject);
-		else
-			printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
-
-		ret = APP_SKR_ERR;
-		goto end;
-	}
-
-	ret = APP_OK;
-	for (i = 0; i < 2; i++) {
-		if ((int16_t)(attrs[i].valueLen) != -1) {
-			attrs[i].value =
-				(void *)malloc(attrs[i].valueLen);
-
-			if (!attrs[i].value) {
-				printf("malloc failed ATTR[%d].Value\n", i);
-				ret = APP_MALLOC_FAIL;
-				goto end;
-			}
-		}
-	}
-
-	sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
-	if (sk_ret != SKR_OK) {
-		printf("Failed to Get Attribute Values.\n");
-		ret = APP_SKR_ERR;
-		goto end;
-	}
+	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * attrCount);
 
 	/* Here we are generating a fake .pem file for satisfying
-	kubernetes/puppet use case */
-	 if (getOptVal->write_to_file) {
-		obj_id = getOptVal->obj_id;
-		file_name = getOptVal->write_to_file;
+	   kubernetes/puppet use case */
+	if (getOptVal->write_to_file) {
+		switch (key_type) {
+			case SKK_RSA:
+				attrs[0].type = SK_ATTR_PUBLIC_EXPONENT;
+				attrs[0].value = NULL;
+				attrs[0].valueLen = 0;
 
-		key_data = generate_fake_private_RSA_key(getOptVal->key_len, obj_id,
-			attrs[0].value, attrs[0].valueLen,
-			attrs[1].value, attrs[1].valueLen);
-		if (!key_data) {
-			printf("generate_fake_private_RSA_key failed \n");
-			ret = APP_SKR_ERR;
-			goto end;
-		}
+				attrs[1].type = SK_ATTR_MODULUS;
+				attrs[1].value = NULL;
+				attrs[1].valueLen = 0;
 
-		fptr = fopen(file_name, "wb");
-		if (fptr == NULL) {
-			printf("File does not exists\n");
-			ret = APP_SKR_ERR;
-			goto end;
+				sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+				if (sk_ret != SKR_OK) {
+					if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
+						printf("\nObject Handle[%d] not found.\n", hObject);
+					else
+						printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
+
+					ret = APP_SKR_ERR;
+					goto end;
+				}
+
+				ret = APP_OK;
+				for (i = 0; i < 2; i++) {
+					if ((int16_t)(attrs[i].valueLen) != -1) {
+						attrs[i].value =
+							(void *)malloc(attrs[i].valueLen);
+
+						if (!attrs[i].value) {
+							printf("malloc failed ATTR[%d].Value\n", i);
+							ret = APP_MALLOC_FAIL;
+							goto end;
+						}
+					}
+				}
+
+				sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+				if (sk_ret != SKR_OK) {
+					printf("Failed to Get Attribute Values.\n");
+					ret = APP_SKR_ERR;
+					goto end;
+				}
+
+
+				obj_id = getOptVal->obj_id;
+				file_name = getOptVal->write_to_file;
+
+				key_data = generate_fake_private_RSA_key(getOptVal->key_len, obj_id,
+						attrs[0].value, attrs[0].valueLen,
+						attrs[1].value, attrs[1].valueLen);
+				if (!key_data) {
+					printf("generate_fake_private_RSA_key failed \n");
+					ret = APP_SKR_ERR;
+					goto end;
+				}
+
+				fptr = fopen(file_name, "wb");
+				if (fptr == NULL) {
+					printf("File does not exists\n");
+					ret = APP_SKR_ERR;
+					goto end;
+				}
+				fwrite(key_data, sizeof(char), strlen(key_data), fptr);
+				break;
+			case SKK_EC:
+				printf("EC Writing not supported\n");
+				break;
+			default:
+				break;
 		}
-		fwrite(key_data, sizeof(char), strlen(key_data), fptr);
 	}
-
 end:
-	for (i = 0; i < 2; i++) {
+	for (i = 0; i < attrCount; i++) {
 		if (attrs[i].value)
 			free(attrs[i].value);
 	}
@@ -765,24 +973,27 @@ void print_usage(void)
 	printf("\t -L - List Object\n");
 	printf("\t -R - Remove/Erase Object\n\n");
 	printf("\t Use below Sub options along with Main options:-\n");
-	printf("\t\t -o - Object Type (Eg: pair, pub etc.)\n");
-	printf("\t\t -k - Key Type (Eg: rsa, ec etc.)\n");
-	printf("\t\t -s - Key Size/Length (Supported: 1024, 2048).\n");
+	printf("\t\t -o - Object Type (Supported: pair, pub)\n");
+	printf("\t\t -k - Key Type (Supported: rsa, ec)\n");
+	printf("\t\t -s - RSA Key Size/Length (Supported: 1024, 2048).\n");
+	printf("\t\t -c - EC Curve (Supported: prime256v1, secp384r1).\n");
 	printf("\t\t -f - File Name (.pem) (Private Key).\n");
 	printf("\t\t -l - Object Label\n");
 	printf("\t\t -i - Object Id. (In Decimal)\n");
 	printf("\t\t -h - Object Handle (In Decimal)\n");
 	printf("\t\t -n - Number of Objects (Default = 5)\n");
-	printf("\t\t -m - Mechanism Id (Eg. rsa-pair, etc.)\n");
-	printf("\t\t -w - Fake .pem file.(Optional command while generating key-pair)\n\n");
+	printf("\t\t -m - Mechanism Id (Supported: rsa-pair, ec-pair)\n");
+	printf("\t\t -w - Fake .pem file.(Optional command while generating key-pair only RSA supported.)\n\n");
 	printf("\tUsage:\n");
 	printf("\t\tCreation:\n");
 	printf("\t\tsobj_app -C -f <private.pem> -k <key-type> -o <obj-type> -s <key-size> -l <obj-label> -i <obj-ID> [-w <file.pem>]\n");
 	printf("\t\tsobj_app -C -f sk_private.pem -k rsa -o pair -s 2048 -l \"Device_Key\" -i 1\n");
+	printf("\t\tsobj_app -C -f sk_private.pem -k ec -o pair -l \"Device_Key\" -i 1\n");
 	printf("\t\tsobj_app -C -f sk_private.pem -k rsa -o pair -s 2048 -l \"Device_Key\" -i 1 -w dev_key.pem\n\n");
 	printf("\t\tGeneration:\n");
 	printf("\t\tsobj_app -G -m <mechanism-ID> -s <key-size> -l <key-label> -i <key-ID> [-w <file.pem>]\n");
 	printf("\t\tsobj_app -G -m rsa-pair -s 2048 -l \"Device_Key\" -i 1\n");
+	printf("\t\tsobj_app -G -m ec-pair -c prime256v1 -l \"Device_Key\" -i 1\n");
 	printf("\t\tsobj_app -G -m rsa-pair -s 2048 -l \"Device_Key\" -i 1 -w dev_key.pem\n\n");
 	printf("\t\tAttributes:\n");
 	printf("\t\tsobj_app -A -h <obj-handle>\n");
@@ -801,56 +1012,59 @@ int process_sub_option(int option, char *optarg, struct getOptValue *getOptVal)
 	FILE *file;
 
 	switch (option) {
-	case 'f':
-		getOptVal->importPrvFile = optarg;
-		file = fopen(getOptVal->importPrvFile, "r");
-		if (!file) {
-			ret = APP_IP_ERR;
-			printf("Error Opening the File.\n");
-		}
-		if (file)
-			fclose(file);
-		break;
-	case 's':
-		getOptVal->key_len = atoi(optarg);
-		if (U32_INVALID == validate_key_len(getOptVal->key_len))
-			ret = APP_IP_ERR;
-		getOptVal->findCritCount++;
-		break;
-	case 'k':
-		getOptVal->key_type = getKeyType(optarg);
-		if (U32_INVALID == getOptVal->key_type)
-			ret = APP_IP_ERR;
-		getOptVal->findCritCount++;
-		break;
-	case 'l':
-		getOptVal->label = optarg;
-		getOptVal->findCritCount++;
-		break;
-	case 'o':
-		getOptVal->obj_type = getObjectType(optarg);
-		if (U32_INVALID == getOptVal->obj_type)
-			ret = APP_IP_ERR;
-		getOptVal->findCritCount++;
-		break;
-	case 'i':
-		getOptVal->obj_id = atoi(optarg);
-		getOptVal->findCritCount++;
-		break;
-	case 'h':
-		getOptVal->hObj = atoi(optarg);
-		break;
-	case 'n':
-		getOptVal->hObjc = atoi(optarg);
-		break;
-	case 'm':
-		getOptVal->mech_type = getMechType(optarg);
-		if (U32_INVALID == getOptVal->mech_type)
-			ret = APP_IP_ERR;
-		break;
-	case 'w':
-		getOptVal->write_to_file = optarg;
-		break;
+		case 'f':
+			getOptVal->importPrvFile = optarg;
+			file = fopen(getOptVal->importPrvFile, "r");
+			if (!file) {
+				ret = APP_IP_ERR;
+				printf("Error Opening the File.\n");
+			}
+			if (file)
+				fclose(file);
+			break;
+		case 's':
+			getOptVal->key_len = atoi(optarg);
+			if (U32_INVALID == validate_key_len(getOptVal->key_len))
+				ret = APP_IP_ERR;
+			getOptVal->findCritCount++;
+			break;
+		case 'k':
+			getOptVal->key_type = getKeyType(optarg);
+			if (U32_INVALID == getOptVal->key_type)
+				ret = APP_IP_ERR;
+			getOptVal->findCritCount++;
+			break;
+		case 'l':
+			getOptVal->label = optarg;
+			getOptVal->findCritCount++;
+			break;
+		case 'o':
+			getOptVal->obj_type = getObjectType(optarg);
+			if (U32_INVALID == getOptVal->obj_type)
+				ret = APP_IP_ERR;
+			getOptVal->findCritCount++;
+			break;
+		case 'i':
+			getOptVal->obj_id = atoi(optarg);
+			getOptVal->findCritCount++;
+			break;
+		case 'h':
+			getOptVal->hObj = atoi(optarg);
+			break;
+		case 'n':
+			getOptVal->hObjc = atoi(optarg);
+			break;
+		case 'm':
+			getOptVal->mech_type = getMechType(optarg);
+			if (U32_INVALID == getOptVal->mech_type)
+				ret = APP_IP_ERR;
+			break;
+		case 'w':
+			getOptVal->write_to_file = optarg;
+			break;
+		case 'c':
+			getOptVal->curve = optarg;
+			break;
 	}
 	return ret;
 }
@@ -863,90 +1077,127 @@ int process_main_option(int operation,
 	int ret = APP_OK;
 
 	switch (option) {
-	case 'C':
-		if (operation == PERFORM) {
-			printf("Creating the Object.\n");
-			if ((getOptVal->key_type == U32_UNINTZD)
-				|| (getOptVal->obj_type == U32_UNINTZD)
-				|| (getOptVal->obj_id == U32_UNINTZD)
-				|| (getOptVal->label == NULL)
-				|| (getOptVal->key_len == U32_UNINTZD)
-				|| (getOptVal->importPrvFile == NULL)) {
-					printf("\tAbort: Missing or Invalid Value to the mandatory options [-f -k -o -i -l -s]\n");
-				ret = APP_IP_ERR;
-				break;
-			}
-			ret = do_CreateObject(getOptVal);
-		} else {
-			getOptVal->main_option = option;
-			(getOptVal->numOfMainOpt)++;
-		}
-		break;
-	case 'G':
-		if (operation == PERFORM) {
-			printf("Generating the Object.\n");
-			if ((getOptVal->mech_type == U32_UNINTZD)
-				|| (getOptVal->obj_id == U32_UNINTZD)
-				|| (getOptVal->label == NULL)
-				|| (getOptVal->key_len == U32_UNINTZD)) {
-					printf("\tAbort: Missing or Invalid Value to one or more of the mandatory options [-i -l -s -m]\n");
+		case 'C':
+			if (operation == PERFORM) {
+				printf("Creating the Object.\n");
+				if ((getOptVal->key_type != U32_UNINTZD)) {
+					switch (getOptVal->key_type) {
+						case SKK_RSA:
+							if ((getOptVal->obj_type == U32_UNINTZD)
+							|| (getOptVal->obj_id == U32_UNINTZD)
+							|| (getOptVal->label == NULL)
+							|| (getOptVal->key_len == U32_UNINTZD)
+							|| (getOptVal->importPrvFile == NULL)) {
+								printf("\tAbort: Missing or Invalid Value to the mandatory options [-f -k -o -i -l -s]\n");
+								ret = APP_IP_ERR;
+							}
+						break;
+						case SKK_EC:
+							if ((getOptVal->obj_type == U32_UNINTZD)
+							|| (getOptVal->obj_id == U32_UNINTZD)
+							|| (getOptVal->label == NULL)
+							|| (getOptVal->importPrvFile == NULL)) {
+								printf("\tAbort: Missing or Invalid Value to the mandatory options [-f -k -o -i -l -s]\n");
+								ret = APP_IP_ERR;
+							}
+						break;
+					}
+					if (ret != APP_OK)
+						break;
+				} else {
+					printf("\tAbort: Missing options -k \n");
 					ret = APP_IP_ERR;
-				break;
+					break;
+				}
+				ret = do_CreateObject(getOptVal);
+			} else {
+				getOptVal->main_option = option;
+				(getOptVal->numOfMainOpt)++;
 			}
-			ret = do_GenerateKeyPair(getOptVal);
-		} else {
-			getOptVal->main_option = option;
-			(getOptVal->numOfMainOpt)++;
-		}
-		break;
-	case 'R':
-		if (operation == PERFORM) {
-			if (getOptVal->hObj == U32_UNINTZD) {
-				printf("Object Handle is not provided to remove/erase. Missing[-h].\n");
-				ret = APP_IP_ERR;
-				break;
+			break;
+		case 'G':
+			if (operation == PERFORM) {
+				printf("Generating the Object.\n");
+				if ((getOptVal->mech_type != U32_UNINTZD)) {
+					switch (getOptVal->mech_type) {
+						case SKM_RSA_PKCS_KEY_PAIR_GEN:
+							if ((getOptVal->obj_id == U32_UNINTZD)
+							|| (getOptVal->label == NULL)
+							|| (getOptVal->key_len == U32_UNINTZD)) {
+								printf("\tAbort: Missing or Invalid Value to the mandatory options [-m -i -l -s]\n");
+								ret = APP_IP_ERR;
+							}
+						break;
+						case SKM_EC_PKCS_KEY_PAIR_GEN:
+							if ((getOptVal->obj_id == U32_UNINTZD)
+							|| (getOptVal->label == NULL)
+							|| (getOptVal->curve == NULL)) {
+								printf("\tAbort: Missing or Invalid Value to the mandatory options [-m -i -l -c]\n");
+								ret = APP_IP_ERR;
+							}
+						break;
+					}
+					if (ret != APP_OK)
+						break;
+				} else {
+					printf("\tAbort: Missing options -m \n");
+					ret = APP_IP_ERR;
+					break;
+				}
+				ret = do_GenerateKeyPair(getOptVal);
+			} else {
+				getOptVal->main_option = option;
+				(getOptVal->numOfMainOpt)++;
 			}
-			ret = do_EraseObject(getOptVal->hObj);
-		} else {
-			getOptVal->main_option = option;
-			(getOptVal->numOfMainOpt)++;
-		}
-		break;
-	case 'L':
-		if (operation == PERFORM) {
-			if (!getOptVal->findCritCount)
-				printf("None of the search option (-i -o -k -s -l) is provided. Listing all Object.\n");
-			if (getOptVal->hObjc == U32_UNINTZD) {
-				printf("Missing Option [-n]. Listing max of 5 objects.\n");
-				getOptVal->hObjc = MAX_FIND_OBJ_SIZE;
+			break;
+		case 'R':
+			if (operation == PERFORM) {
+				if (getOptVal->hObj == U32_UNINTZD) {
+					printf("Object Handle is not provided to remove/erase. Missing[-h].\n");
+					ret = APP_IP_ERR;
+					break;
+				}
+				ret = do_EraseObject(getOptVal->hObj);
+			} else {
+				getOptVal->main_option = option;
+				(getOptVal->numOfMainOpt)++;
 			}
-			ret = do_EnumerateObject(getOptVal);
-		} else {
-			getOptVal->main_option = option;
-			(getOptVal->numOfMainOpt)++;
-		}
-		break;
-	case 'A':
-		if (operation == PERFORM) {
-			if (getOptVal->hObj == U32_UNINTZD) {
-				printf("Object Handle is not provided for Attribute Listing. Missing[-h].\n");
-				ret = APP_IP_ERR;
-				break;
+			break;
+		case 'L':
+			if (operation == PERFORM) {
+				if (!getOptVal->findCritCount)
+					printf("None of the search option (-i -o -k -s -l) is provided. Listing all Object.\n");
+				if (getOptVal->hObjc == U32_UNINTZD) {
+					printf("Missing Option [-n]. Listing max of 5 objects.\n");
+					getOptVal->hObjc = MAX_FIND_OBJ_SIZE;
+				}
+				ret = do_EnumerateObject(getOptVal);
+			} else {
+				getOptVal->main_option = option;
+				(getOptVal->numOfMainOpt)++;
 			}
-			ret = do_GetObjectAttributes(getOptVal->hObj);
-		} else {
-			getOptVal->main_option = option;
-			(getOptVal->numOfMainOpt)++;
-		}
-		break;
-	default:
-		if (getOptVal->numOfMainOpt) {
-			if (option != '?')
-				ret = process_sub_option(option, optarg, getOptVal);
-		} else {
-			print_usage();
-			exit(EXIT_FAILURE);
-		}
+			break;
+		case 'A':
+			if (operation == PERFORM) {
+				if (getOptVal->hObj == U32_UNINTZD) {
+					printf("Object Handle is not provided for Attribute Listing. Missing[-h].\n");
+					ret = APP_IP_ERR;
+					break;
+				}
+				ret = do_GetObjectAttributes(getOptVal->hObj);
+			} else {
+				getOptVal->main_option = option;
+				(getOptVal->numOfMainOpt)++;
+			}
+			break;
+		default:
+			if (getOptVal->numOfMainOpt) {
+				if (option != '?')
+					ret = process_sub_option(option, optarg, getOptVal);
+			} else {
+				print_usage();
+				exit(EXIT_FAILURE);
+			}
 	}
 	return ret;
 }
@@ -969,13 +1220,14 @@ int main(int argc, char *argv[])
 		.mech_type = U32_UNINTZD,
 		.findCritCount = 0,
 		.write_to_file = NULL,
+		.curve = NULL,
 	};
 
 	int option;
 	extern char *optarg; extern int optind;
 	int ret = APP_OK;
 
-	while ((option = getopt(argc, argv, "CGRLAf:i:k:gh:l:o:m:n:s:w:")) != -1) {
+	while ((option = getopt(argc, argv, "CGRLAf:i:k:gh:l:o:m:n:s:w:c:")) != -1) {
 		ret = process_main_option(PARSE, option, optarg, &getOptVal);
 		if (ret != APP_OK)
 			break;
