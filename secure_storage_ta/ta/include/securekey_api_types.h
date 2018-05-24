@@ -98,6 +98,11 @@ typedef SK_TYPE SK_ATTRIBUTE_TYPE;
 #define SK_ATTR_EXPONENT_2		37 /* Big integer Private exponent d modulo q-1 */
 #define SK_ATTR_COEFFICIENT		38 /* Big integer CRT coefficient q-1 mod p */
 
+/* Attributes For ECC Key Pair */
+#define SK_ATTR_PARAMS			50 /* OID of curve */
+#define SK_ATTR_POINT			51 /* Public point */
+#define SK_ATTR_PRIV_VALUE		52 /* Private Value */
+
 /*
  * Stores all the information required for an object's attribute - its type, value and value length.
  */
@@ -153,6 +158,7 @@ typedef SK_TYPE SK_MECHANISM_TYPE;
 #define		SKM_SHA384				135
 #define		SKM_SHA512				136
 #define		SKM_RSA_PKCS_KEY_PAIR_GEN		141
+#define		SKM_EC_PKCS_KEY_PAIR_GEN		142
 
 /*
  * Specifying the required information in order to use a mechanism,

@@ -37,13 +37,18 @@ TEE_Result pack_sk_attrs(const SK_ATTRIBUTE *attrs, uint32_t attr_count,
 	bl = sizeof(uint32_t);
 	for (n = 0; n < attr_count; n++) {
 		switch (attrs[n].type) {
+		/* General Purpose Object Attributes */
 		case SK_ATTR_OBJECT_TYPE:
 		case SK_ATTR_OBJECT_INDEX:
 		case SK_ATTR_KEY_TYPE:
 		case SK_ATTR_OBJECT_LABEL:
+		/* RSA Object Attributes */
 		case SK_ATTR_MODULUS_BITS:
 		case SK_ATTR_MODULUS:
 		case SK_ATTR_PUBLIC_EXPONENT:
+		/* EC Object Attributes */
+		case SK_ATTR_PARAMS:
+		case SK_ATTR_POINT:
 			bl += sizeof(struct attr_packed);
 			if (attrs[n].value != NULL &&
 			    ((int16_t)attrs[n].valueLen) > 0)
@@ -70,13 +75,18 @@ TEE_Result pack_sk_attrs(const SK_ATTRIBUTE *attrs, uint32_t attr_count,
 
 	for (n = 0; n < attr_count; n++) {
 		switch (attrs[n].type) {
+		/* General Purpose Object Attributes */
 		case SK_ATTR_OBJECT_TYPE:
 		case SK_ATTR_OBJECT_INDEX:
 		case SK_ATTR_KEY_TYPE:
 		case SK_ATTR_OBJECT_LABEL:
+		/* RSA Object Attributes */
 		case SK_ATTR_MODULUS_BITS:
 		case SK_ATTR_MODULUS:
 		case SK_ATTR_PUBLIC_EXPONENT:
+		/* EC Object Attributes */
+		case SK_ATTR_PARAMS:
+		case SK_ATTR_POINT:
 			a[n].id = attrs[n].type;
 			a[n].b = attrs[n].valueLen;
 

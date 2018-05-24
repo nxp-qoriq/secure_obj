@@ -55,8 +55,30 @@ static TEE_Result TA_GetTEEObjectTypeAndAttr(SK_ATTRIBUTE *attrs,
 						  *tee_attrs, tee_attr_count);
 
 		} else if (key_type == SKK_EC) {
-			/* TODO: ECC keys not supported */
-			return TEE_ERROR_NOT_SUPPORTED;
+#define MAX_EC_KEYPAIR_ATTR		4
+			SK_ATTRIBUTE *attr_ec_curve;
+			uint32_t ec_size;
+
+			attr_ec_curve = TA_GetSKAttr(SK_ATTR_PARAMS,
+						     attrs, attr_count);
+			if (attr_ec_curve == NULL)
+				return TEE_ERROR_BAD_PARAMETERS;
+
+			if (!get_ec_obj_size(attr_ec_curve, &ec_size)) {
+				*obj_size = ec_size;
+			} else {
+				EMSG("Algo Not Supported\n");
+				return TEE_ERROR_BAD_PARAMETERS;
+			}
+
+			*obj_type = TEE_TYPE_ECDSA_KEYPAIR;
+			*tee_attrs = TEE_Malloc(MAX_EC_KEYPAIR_ATTR *
+						sizeof(TEE_Attribute), 0);
+			if (!*tee_attrs)
+				return TEE_ERROR_OUT_OF_MEMORY;
+
+			fill_ec_keypair_tee_attr(attrs, attr_count,
+				*tee_attrs, tee_attr_count, *obj_size);
 		} else {
 			return TEE_ERROR_BAD_PARAMETERS;
 		}
@@ -90,8 +112,31 @@ static TEE_Result TA_GetTEEObjectTypeAndAttr(SK_ATTRIBUTE *attrs,
 			fill_rsa_pubkey_tee_attr(attrs, attr_count,
 						 *tee_attrs, tee_attr_count);
 		} else if (key_type == SKK_EC) {
+#define MAX_EC_PUBLIC_KEY_ATTR		3
 			/* TODO: ECC keys not supported */
-			return TEE_ERROR_NOT_SUPPORTED;
+			SK_ATTRIBUTE *attr_ec_curve;
+			uint32_t ec_size;
+
+			attr_ec_curve = TA_GetSKAttr(SK_ATTR_PARAMS,
+						     attrs, attr_count);
+			if (attr_ec_curve == NULL)
+				return TEE_ERROR_BAD_PARAMETERS;
+
+			if (!get_ec_obj_size(attr_ec_curve, &ec_size)) {
+				*obj_size = ec_size;
+			} else {
+				EMSG("Algo Not Supported\n");
+				return TEE_ERROR_BAD_PARAMETERS;
+			}
+
+			*obj_type = TEE_TYPE_ECDSA_PUBLIC_KEY;
+			*tee_attrs = TEE_Malloc(MAX_EC_PUBLIC_KEY_ATTR *
+						sizeof(TEE_Attribute), 0);
+			if (!*tee_attrs)
+				return TEE_ERROR_OUT_OF_MEMORY;
+
+			fill_ec_pubkey_tee_attr(attrs, attr_count,
+				*tee_attrs, tee_attr_count, *obj_size);
 		} else {
 			return TEE_ERROR_BAD_PARAMETERS;
 		}

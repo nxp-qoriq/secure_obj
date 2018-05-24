@@ -14,6 +14,114 @@
 
 static uint8_t modulus[MAX_KEY_SIZE_BYTES];
 static uint8_t pub_exp[MAX_KEY_SIZE_BYTES];
+static uint8_t ec_pub_point[MAX_KEY_SIZE_BYTES];
+
+static TEE_Result TA_GenerateECKeyPair(TEE_ObjectHandle *tObject,
+					void *in_buffer, uint32_t size,
+					SK_ATTRIBUTE *attrs,
+					uint32_t *attr_count)
+{
+	TEE_Result res;
+	SK_ATTRIBUTE *in_attrs = NULL;
+	uint32_t in_attr_cnt = 0;
+	SK_ATTRIBUTE *get_attr;
+	TEE_Attribute curve_attr = {0};
+	uint32_t obj_type, obj_size, key_attr_cnt = 0;
+	uint32_t obj_ret_size;
+	uint32_t ec_size;
+
+	ec_pub_point[0] = 0x4;
+
+	DMSG("Unpack Object attributes!\n");
+	res = unpack_sk_attrs(in_buffer, size, &in_attrs, &in_attr_cnt);
+	if (res != TEE_SUCCESS)
+		goto out;
+
+	obj_type = TEE_TYPE_ECDSA_KEYPAIR;
+
+	/* Get EC key size from SK_ATTR_PARAMS attribute */
+	get_attr = TA_GetSKAttr(SK_ATTR_PARAMS, in_attrs,
+				in_attr_cnt);
+	if (get_attr == NULL)
+		return TEE_ERROR_BAD_PARAMETERS;
+
+	if (!get_ec_obj_size(get_attr, &ec_size)) {
+		obj_size = ec_size;
+	} else {
+		EMSG("Algo Not Supported\n");
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+
+	attrs[*attr_count].type = get_attr->type;
+	attrs[*attr_count].value = get_attr->value;
+	attrs[*attr_count].valueLen = get_attr->valueLen;
+	(*attr_count)++;
+
+	DMSG("Allocate Transient Object!\n");
+	res = TEE_AllocateTransientObject(obj_type, obj_size, tObject);
+	if (res != TEE_SUCCESS)
+		goto out;
+
+	if (obj_size == 256) {
+		TEE_InitValueAttribute(&curve_attr, TEE_ATTR_ECC_CURVE,
+				     TEE_ECC_CURVE_NIST_P256, sizeof(int));
+	} else {
+		TEE_InitValueAttribute(&curve_attr, TEE_ATTR_ECC_CURVE,
+				     TEE_ECC_CURVE_NIST_P384, sizeof(int));
+	}
+	key_attr_cnt++;
+	obj_ret_size = obj_size;
+
+	DMSG("Generate EC key pair!\n");
+	res = TEE_GenerateKey(*tObject, obj_size, &curve_attr, key_attr_cnt);
+	if (res != TEE_SUCCESS)
+		goto out;
+
+	DMSG("Get EC key POINT attribute!\n");
+	res = TEE_GetObjectBufferAttribute(*tObject, TEE_ATTR_ECC_PUBLIC_VALUE_X,
+					   &ec_pub_point[1],
+					   &obj_ret_size);
+	if (res != TEE_SUCCESS)
+		goto out;
+
+	res = TEE_GetObjectBufferAttribute(*tObject, TEE_ATTR_ECC_PUBLIC_VALUE_Y,
+					   &ec_pub_point[1+obj_ret_size],
+					   &obj_ret_size);
+	if (res != TEE_SUCCESS)
+		goto out;
+
+	attrs[*attr_count].type = SK_ATTR_POINT;
+	attrs[*attr_count].value = ec_pub_point;
+	attrs[*attr_count].valueLen = (2*obj_size) + 1;
+	(*attr_count)++;
+
+	/* Check if EC key object index is passed in input attrs */
+	get_attr = TA_GetSKAttr(SK_ATTR_OBJECT_INDEX, in_attrs,
+				in_attr_cnt);
+	if (get_attr) {
+		attrs[*attr_count].type = get_attr->type;
+		attrs[*attr_count].value = get_attr->value;
+		attrs[*attr_count].valueLen = get_attr->valueLen;
+		(*attr_count)++;
+	}
+
+	/* Check if EC key object label is passed in input attrs */
+	get_attr = TA_GetSKAttr(SK_ATTR_OBJECT_LABEL, in_attrs,
+				in_attr_cnt);
+	if (get_attr) {
+		attrs[*attr_count].type = get_attr->type;
+		attrs[*attr_count].value = get_attr->value;
+		attrs[*attr_count].valueLen = get_attr->valueLen;
+		(*attr_count)++;
+	}
+
+out:
+	if (in_attrs)
+		TEE_Free(in_attrs);
+
+	return res;
+}
+
 
 static TEE_Result TA_GenerateRSAKeyPair(TEE_ObjectHandle *tObject,
 					void *in_buffer, uint32_t size,
@@ -164,6 +272,28 @@ TEE_Result TA_GenerateKeyPair(uint32_t param_types, TEE_Param params[4])
 
 		/* Generate RSA key pair */
 		res = TA_GenerateRSAKeyPair(&tObject, params[1].memref.buffer,
+					    params[1].memref.size, attrs,
+					    &attr_count);
+		if (res != TEE_SUCCESS)
+			goto out;
+		break;
+	case SKM_EC_PKCS_KEY_PAIR_GEN:
+		/* Fill SK attributes with obj type */
+		sk_obj_type = SK_KEY_PAIR;
+		attrs[attr_count].type = SK_ATTR_OBJECT_TYPE;
+		attrs[attr_count].value = &sk_obj_type;
+		attrs[attr_count].valueLen = sizeof(SK_OBJECT_TYPE);
+		attr_count++;
+
+		/* Fill SK attributes with key type */
+		sk_key_type = SKK_EC;
+		attrs[attr_count].type = SK_ATTR_KEY_TYPE;
+		attrs[attr_count].value = &sk_key_type;
+		attrs[attr_count].valueLen = sizeof(SK_KEY_TYPE);
+		attr_count++;
+
+		/* Generate EC key pair */
+		res = TA_GenerateECKeyPair(&tObject, params[1].memref.buffer,
 					    params[1].memref.size, attrs,
 					    &attr_count);
 		if (res != TEE_SUCCESS)
