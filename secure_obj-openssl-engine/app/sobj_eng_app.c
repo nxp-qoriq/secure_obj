@@ -56,9 +56,9 @@ int main(int argc, char *argv[])
 	int byte_key_size = 0, plain_text_len = 0;
 	int decrypted_length = 0, encrypted_length = 0;
 	uint8_t *encrypted = NULL, *decrypted = NULL, ret = 0;
-	EVP_PKEY *priv_key;
-	ENGINE *eng;
-	FILE *fptr;
+	EVP_PKEY *priv_key = NULL;
+	ENGINE *eng = NULL;
+	FILE *fptr = NULL;
 
 	if (argc <= 1) {
 		printf("Please give the label of Private Key to be used\n");
