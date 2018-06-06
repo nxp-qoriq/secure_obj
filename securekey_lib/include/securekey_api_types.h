@@ -158,7 +158,14 @@ typedef SK_TYPE SK_MECHANISM_TYPE;
 #define		SKM_SHA384				135
 #define		SKM_SHA512				136
 #define		SKM_RSA_PKCS_KEY_PAIR_GEN		141
-#define		SKM_EC_PKCS_KEY_PAIR_GEN		142
+
+#define		SKM_ECDSA				150
+#define		SKM_ECDSA_SHA1				151
+#define		SKM_ECDSA_SHA256			152
+#define		SKM_ECDSA_SHA384			153
+#define		SKM_ECDSA_SHA512			154
+
+#define		SKM_EC_PKCS_KEY_PAIR_GEN		161
 
 /*
  * Specifying the required information in order to use a mechanism,

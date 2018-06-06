@@ -70,7 +70,6 @@ static TEE_Result TA_GenerateECKeyPair(TEE_ObjectHandle *tObject,
 				     TEE_ECC_CURVE_NIST_P384, sizeof(int));
 	}
 	key_attr_cnt++;
-	obj_ret_size = obj_size;
 
 	DMSG("Generate EC key pair!\n");
 	res = TEE_GenerateKey(*tObject, obj_size, &curve_attr, key_attr_cnt);
@@ -78,6 +77,12 @@ static TEE_Result TA_GenerateECKeyPair(TEE_ObjectHandle *tObject,
 		goto out;
 
 	DMSG("Get EC key POINT attribute!\n");
+	res = TEE_GetObjectBufferAttribute(*tObject, TEE_ATTR_ECC_PUBLIC_VALUE_X,
+					   NULL,
+					   &obj_ret_size);
+	if (res != TEE_ERROR_SHORT_BUFFER)
+		goto out;
+
 	res = TEE_GetObjectBufferAttribute(*tObject, TEE_ATTR_ECC_PUBLIC_VALUE_X,
 					   &ec_pub_point[1],
 					   &obj_ret_size);
@@ -92,7 +97,7 @@ static TEE_Result TA_GenerateECKeyPair(TEE_ObjectHandle *tObject,
 
 	attrs[*attr_count].type = SK_ATTR_POINT;
 	attrs[*attr_count].value = ec_pub_point;
-	attrs[*attr_count].valueLen = (2*obj_size) + 1;
+	attrs[*attr_count].valueLen = (2 * obj_ret_size) + 1;
 	(*attr_count)++;
 
 	/* Check if EC key object index is passed in input attrs */

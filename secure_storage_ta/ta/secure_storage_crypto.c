@@ -92,6 +92,18 @@ out:
 	return res;
 }
 
+int get_ec_algorithm(size_t obj_size)
+{
+	switch (obj_size) {
+		case 256:
+			return TEE_ALG_ECDSA_P256;
+		case 384:
+			return TEE_ALG_ECDSA_P384;
+		default:
+			return TEE_ERROR_NOT_SUPPORTED;
+	}
+}
+
 /*
  * Input params:
  * param#0 : object ID and SK sign mechanism
@@ -133,13 +145,22 @@ TEE_Result TA_SignDigest(uint32_t param_types, TEE_Param params[4])
 		goto out;
 
 	if (params[2].memref.buffer == NULL) {
-		params[2].memref.size = objectInfo.objectSize;
+		switch (objectInfo.objectType) {
+			case TEE_TYPE_RSA_KEYPAIR:
+				params[2].memref.size = objectInfo.maxObjectSize;
+				break;
+			case TEE_TYPE_ECDSA_KEYPAIR:
+				params[2].memref.size = 2 * objectInfo.maxObjectSize;
+				break;
+			default:
+				EMSG("Only RSA and EC Private Key object is supported\n");
+		}
 		goto out;
 	}
 
 	DMSG("Allocate Transient Object!\n");
 	res = TEE_AllocateTransientObject(objectInfo.objectType,
-					  objectInfo.objectSize, &tObject);
+					  objectInfo.maxObjectSize, &tObject);
 	if (res != TEE_SUCCESS)
 		goto out;
 
@@ -167,14 +188,22 @@ TEE_Result TA_SignDigest(uint32_t param_types, TEE_Param params[4])
 	case SKM_RSASSA_PKCS1_V1_5_SHA512:
 		algorithm = TEE_ALG_RSASSA_PKCS1_V1_5_SHA512;
 		break;
+	case SKM_ECDSA:
+	case SKM_ECDSA_SHA1:
+	case SKM_ECDSA_SHA256:
+	case SKM_ECDSA_SHA384:
+	case SKM_ECDSA_SHA512:
+		algorithm = get_ec_algorithm(objectInfo.maxObjectSize);
+		break;
 	default:
 		res = TEE_ERROR_BAD_PARAMETERS;
 		goto out;
 	}
 
-	DMSG("Allocate Operation!\n");
+	DMSG("Allocate Operation alog = %x, mode = %u, maxobj_size = %u!\n",
+		algorithm, TEE_MODE_SIGN,  objectInfo.maxObjectSize);
 	res = TEE_AllocateOperation(&operation, algorithm, TEE_MODE_SIGN,
-				    objectInfo.objectSize);
+				    objectInfo.maxObjectSize);
 	if (res != TEE_SUCCESS)
 		goto out;
 
@@ -182,6 +211,9 @@ TEE_Result TA_SignDigest(uint32_t param_types, TEE_Param params[4])
 	res = TEE_SetOperationKey(operation, tObject);
 	if (res != TEE_SUCCESS)
 		goto out;
+
+	DMSG("Digest len = %u\n",
+		 params[1].memref.size);
 
 	DMSG("Asymetric Sign Digest!\n");
 	res = TEE_AsymmetricSignDigest(operation, NULL, 0,

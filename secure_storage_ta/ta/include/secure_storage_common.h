@@ -62,4 +62,7 @@ void fill_ec_pubkey_tee_attr(SK_ATTRIBUTE *attrs, uint32_t attr_count,
 			      TEE_Attribute *tee_attrs,
 			      uint32_t *tee_attr_count, uint32_t obj_size);
 int get_ec_obj_size(SK_ATTRIBUTE *attr, uint32_t *obj_size);
+
+int get_ec_algorithm(size_t obj_size);
+
 #endif /*SECURE_STORAGE_COMMON_H*/

@@ -45,9 +45,9 @@ int import_ec_key(char *ec_file, ec_key_t **ec_key_ret)
 	ASN1_OBJECT *asn1_obj;
 	const EC_GROUP *ec_group;
 	ec_key_t *ec_key_st;
-	int ec_key_len, ec_priv_len;
+	int ec_key_len, ec_priv_len, der_enc_size;
 	const char *sname;
-	char *pubkey_oct;
+	unsigned char *pubkey_oct, *ec_params_der, *ec_params_der_temp;
 	int curve_nid = 0;
 	int total_len, pubkey_oct_len, octet_len;
 
@@ -92,11 +92,14 @@ int import_ec_key(char *ec_file, ec_key_t **ec_key_ret)
 		goto cleanup;
 	}
 
-	curve_nid = EC_GROUP_get_curve_name(EC_KEY_get0_group(eckey));
-	asn1_obj = OBJ_nid2obj(curve_nid);
-	sname = OBJ_nid2sn(curve_nid);
+	der_enc_size = i2d_ECPKParameters(ec_group, NULL);
+	ec_params_der = malloc(der_enc_size);
+	ec_params_der_temp = ec_params_der;
+
+	i2d_ECPKParameters(ec_group, &ec_params_der);
 
 	EC_GROUP_get_order(ec_group, bn_order, NULL);
+
 	ec_key_len = BN_num_bytes(bn_order);
 	if (validate_ec_key_len(ec_key_len) == U32_INVALID) {
 		ret = APP_SKR_ERR;
@@ -120,7 +123,7 @@ int import_ec_key(char *ec_file, ec_key_t **ec_key_ret)
 	}
 
 	ec_priv_len = BN_num_bytes(ec_priv_key);
-	total_len = octet_len + ec_priv_len + strlen(sname);
+	total_len = octet_len + ec_priv_len + der_enc_size;
 	ec_key_st = malloc(total_len + sizeof(ec_key_t));
 	if (!ec_key_st) {
 		ret = APP_MALLOC_FAIL;
@@ -128,13 +131,13 @@ int import_ec_key(char *ec_file, ec_key_t **ec_key_ret)
 	}
 
 	ec_key_st->params = (uint8_t *)ec_key_st + (sizeof(ec_key_t));
-	ec_key_st->params_len = strlen(sname);
+	ec_key_st->params_len = der_enc_size;
 	ec_key_st->public_point = (uint8_t *)ec_key_st->params + ec_key_st->params_len;
 	ec_key_st->public_point_len = octet_len;
 	ec_key_st->priv_value = (uint8_t *)ec_key_st->public_point + ec_key_st->public_point_len;
 	ec_key_st->priv_value_len = ec_priv_len;
 
-	memcpy(ec_key_st->params, sname, strlen(sname));
+	memcpy(ec_key_st->params, ec_params_der_temp, der_enc_size);
 	memcpy(ec_key_st->public_point, pubkey_oct, ec_key_st->public_point_len);
 	BN_bn2bin(ec_priv_key, ec_key_st->priv_value);
 
@@ -442,6 +445,38 @@ end:
 	return (key_data);
 }
 
+int get_der_enc_from_curve(char *curve_name, char **der_encoding,
+			int *der_encoding_size)
+{
+	int nid, der_enc_size;
+	unsigned char *ec_params_der, *ec_params_der_temp;
+
+	EC_GROUP *group;
+
+	nid = OBJ_sn2nid(curve_name);
+	group = EC_GROUP_new_by_curve_name(nid);
+	if (group == NULL) {
+		printf("unable to create curve (%s)\n", curve_name);
+		return APP_OPSSL_ERR;
+	}
+
+	EC_GROUP_set_asn1_flag(group, OPENSSL_EC_NAMED_CURVE);
+	EC_GROUP_set_point_conversion_form(group, POINT_CONVERSION_UNCOMPRESSED);
+
+	der_enc_size = i2d_ECPKParameters(group, NULL);
+	ec_params_der = malloc(der_enc_size);
+	if (ec_params_der == NULL)
+		return APP_MALLOC_FAIL;
+
+	ec_params_der_temp = ec_params_der;
+
+	i2d_ECPKParameters(group, &ec_params_der);
+
+	*der_encoding = ec_params_der_temp;
+	*der_encoding_size = der_enc_size;
+
+	return APP_OK;
+}
 
 static int do_CreateObject(struct getOptValue *getOptVal)
 {
@@ -636,7 +671,7 @@ cleanup:
 static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 {
 #define	MAX_SK_ATTRS	4
-	int ret = APP_OK, i = 0;
+	int ret = APP_OK, i = 0, der_enc_size = 0;
 	SK_RET_CODE sk_ret;
 	SK_ATTRIBUTE attrs[MAX_SK_ATTRS];
 	uint16_t attrCount = 0;
@@ -644,7 +679,7 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 	SK_MECHANISM_INFO mechanismType = {0};
 	FILE *fptr = NULL;
 	char *label = NULL, *file_name = NULL;
-	char *key_data = NULL;
+	char *key_data = NULL, *curve_der_encoding = NULL;
 	uint32_t obj_id;
 	SK_KEY_TYPE key_type;
 
@@ -685,9 +720,15 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 				goto end;
 			}
 
+			ret = get_der_enc_from_curve(getOptVal->curve,
+						&curve_der_encoding,
+						&der_enc_size);
+			if (ret != APP_OK)
+				goto end;
+
 			attrs[attrCount].type = SK_ATTR_PARAMS;
-			attrs[attrCount].value = getOptVal->curve;
-			attrs[attrCount].valueLen = sizeof(getOptVal->curve);
+			attrs[attrCount].value = curve_der_encoding;
+			attrs[attrCount].valueLen = der_enc_size;
 			attrCount++;
 			break;
 		default:
@@ -704,6 +745,9 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 		ret = APP_OK;
 		printf("Object generated successfully handle = %u\n", hObject);
 	}
+
+	if (mechanismType.mechanism == SKM_EC_PKCS_KEY_PAIR_GEN)
+		free(curve_der_encoding);
 
 	memset(attrs, 0, sizeof(SK_ATTRIBUTE) * attrCount);
 

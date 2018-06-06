@@ -184,17 +184,35 @@ static void do_GetObjectAttributes(SK_OBJECT_HANDLE hObject)
 	}
 }
 
-static void do_Sign(SK_OBJECT_HANDLE hObject)
+static void do_Sign(SK_OBJECT_HANDLE hObject, int mech)
 {
 	int ret, n = 0;
 	SK_MECHANISM_INFO mechanismType = {0};
 	uint8_t *signature = NULL;
-	uint16_t signatureLen = 0;
+	uint16_t signatureLen = 0, data_len = 0;
+	const uint8_t *data = NULL;
 
-	mechanismType.mechanism = SKM_RSASSA_PKCS1_V1_5_SHA256;
+	if (mech == 0) {
+		mechanismType.mechanism = SKM_ECDSA_SHA1;
+		data = rsa_digest_sha1;
+		data_len = 160;
+	} else if (mech == 1) {
+		mechanismType.mechanism = SKM_ECDSA_SHA256;
+		data = rsa_digest_sha256;
+		data_len = 256;
+	} else if (mech == 2) {
+		mechanismType.mechanism = SKM_ECDSA_SHA384;
+		data = rsa_digest_sha384;
+		data_len = 384;
+	} else {
+		mechanismType.mechanism = SKM_ECDSA_SHA512;
+		data = rsa_digest_sha512;
+		data_len = 512;
+	}
 
-	ret = SK_Sign(&mechanismType, hObject, rsa_digest_sha256,
-		      sizeof(rsa_digest_sha256), signature, &signatureLen);
+
+	ret = SK_Sign(&mechanismType, hObject, data,
+		      data_len, signature, &signatureLen);
 	if (ret != SKR_OK)
 		printf("SK_Sign1 failed with code = 0x%x\n", ret);
 
@@ -202,6 +220,7 @@ static void do_Sign(SK_OBJECT_HANDLE hObject)
 	signatureLen = signatureLen/8;
 
 	signature = (uint8_t *)malloc(signatureLen);
+	printf("Signature len = %d\n", signatureLen);
 
 	ret = SK_Sign(&mechanismType, hObject, rsa_digest_sha256,
 		      sizeof(rsa_digest_sha256), signature, &signatureLen);
@@ -283,6 +302,8 @@ static void do_Digest(void)
 
 int main(int argc, char *argv[])
 {
+	do_Sign(atoi(argv[1]), atoi(argv[2]));
+#if 0
 	SK_OBJECT_HANDLE obj1, obj2;
 
 	obj1 = do_CreateObject();
@@ -293,6 +314,7 @@ int main(int argc, char *argv[])
 
 	/* Operations with imported object */
 	do_GetObjectAttributes(obj1);
+
 	do_Sign(obj1);
 	do_Decrypt(obj1);
 
@@ -303,6 +325,6 @@ int main(int argc, char *argv[])
 
 	do_EraseObject(obj1);
 	do_EraseObject(obj2);
-
+#endif
 	return 0;
 }
