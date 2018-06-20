@@ -130,6 +130,7 @@ int import_ec_key(char *ec_file, ec_key_t **ec_key_ret)
 		goto cleanup;
 	}
 
+	ec_key_st->curve_nid = EC_GROUP_get_curve_name(ec_group);
 	ec_key_st->params = (uint8_t *)ec_key_st + (sizeof(ec_key_t));
 	ec_key_st->params_len = der_enc_size;
 	ec_key_st->public_point = (uint8_t *)ec_key_st->params + ec_key_st->params_len;
@@ -348,6 +349,96 @@ unsigned char *copy_bio_data(BIO *out, int *data_lenp)
 		printf("malloc failed");
 	}
 	return data;
+}
+
+char *generate_fake_private_ec_key (int curve, uint32_t obj_id,
+		void *ec_pub_point, uint16_t ec_point_len,
+		void *ec_params, uint16_t ec_param_len)
+{
+	char *key_data = NULL;
+	uint32_t *priv_key = NULL, priv_key_len  = 0;
+	unsigned char *priv_key_temp = NULL;
+	EC_KEY		*ec_key  = NULL;
+	EVP_PKEY	*pkey   = NULL;
+	EC_POINT	*ec_point = NULL;
+	const BIGNUM 	*ec_priv_key = NULL;
+	int ec_curve_nid;
+	int i = 0, j = 0;
+	FILE *fptr;
+
+	ec_curve_nid = curve;
+	ec_key = EC_KEY_new_by_curve_name(ec_curve_nid);
+
+	if (!(EC_KEY_generate_key(ec_key))) {
+		printf("Error generating the ECC key.\n");
+		goto end;
+	}
+
+	EC_KEY_set_asn1_flag(ec_key, OPENSSL_EC_NAMED_CURVE);
+
+	ec_point = EC_POINT_new(EC_KEY_get0_group(ec_key));
+	EC_POINT_oct2point(EC_KEY_get0_group(ec_key), ec_point,
+			ec_pub_point, ec_point_len, NULL);
+	EC_KEY_set_public_key(ec_key, ec_point);
+
+	ec_priv_key = EC_KEY_get0_private_key(ec_key);
+	if (!ec_priv_key) {
+		printf("EC_KEY_get0_private_key failed\n");
+		goto end;
+	}
+
+	priv_key_len = BN_num_bytes(ec_priv_key);
+	priv_key_temp = (char *)malloc(priv_key_len);
+	if (!priv_key_temp) {
+		printf("malloc failed for priv_key_exp_temp\n");
+		goto end;
+	}
+
+	priv_key_temp[0] = 0x10;
+
+	priv_key_temp[priv_key_len - 1] = obj_id;
+	for (j=0; j < 2; j++) {
+		for (i=5; i<9; i++) {
+			priv_key_temp[priv_key_len-i-(j*4)] = (uint8_t)(SOBJ_KEY_ID>> 8*(i-5));
+		}
+	}
+
+#if 0
+	for (i = 0; i < priv_key_len; i++) {
+		printf("%02x:", priv_key_temp[i]);
+		if (((i+1) %16) == 0)
+			printf("\n");
+	}
+#endif
+
+	if (!EC_KEY_set_private_key(ec_key,
+		BN_bin2bn(priv_key_temp, priv_key_len, NULL))) {
+		printf("EC_KEY_set_private_key failed\n");
+		goto end;
+	}
+
+	BIO *out = BIO_new(BIO_s_mem());
+	if (!out) {
+		printf("BIO_new failed\n");
+		goto end;
+	}
+
+	if (!PEM_write_bio_ECPrivateKey(out, ec_key, NULL, NULL, 0, NULL, NULL)) {
+		printf("PEM_write_bio_ECPrivateKey failed\n");
+		goto end;
+	}
+
+	key_data = (char *)copy_bio_data(out, NULL);
+
+end:
+	if (out)
+		BIO_free(out);
+	if (pkey)
+		EVP_PKEY_free(pkey);
+	if (ec_key)
+		EC_KEY_free(ec_key);
+
+	return (key_data);
 }
 
 char *generate_fake_private_RSA_key (int key_size, uint32_t obj_id,
@@ -632,7 +723,63 @@ static int do_CreateObject(struct getOptValue *getOptVal)
 				fwrite(key_data, sizeof(char), strlen(key_data), fptr);
 			break;
 			case SKK_EC:
-				printf("EC Writing not supported\n");
+				attrs[0].type = SK_ATTR_POINT;
+				attrs[0].value = NULL;
+				attrs[0].valueLen = 0;
+
+				sk_ret = SK_GetObjectAttribute(hObject, attrs, 1);
+				if (sk_ret != SKR_OK) {
+					if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
+						printf("\nObject Handle[%d] not found.\n", hObject);
+					else
+						printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
+
+					ret = APP_SKR_ERR;
+					goto cleanup;
+				}
+
+				ret = APP_OK;
+				for (i = 0; i < 1; i++) {
+					if ((int16_t)(attrs[i].valueLen) != -1) {
+						attrs[i].value =
+							(void *)malloc(attrs[i].valueLen);
+
+						if (!attrs[i].value) {
+							printf("malloc failed ATTR[%d].Value\n", i);
+							ret = APP_MALLOC_FAIL;
+							goto cleanup;
+						}
+					}
+				}
+
+				sk_ret = SK_GetObjectAttribute(hObject, attrs, 1);
+				if (sk_ret != SKR_OK) {
+					printf("Failed to Get Attribute Values.\n");
+					ret = APP_SKR_ERR;
+					goto cleanup;
+				}
+
+
+				obj_id = getOptVal->obj_id;
+				file_name = getOptVal->write_to_file;
+
+				key_data = generate_fake_private_ec_key(ec_key->curve_nid, obj_id,
+						attrs[0].value, attrs[0].valueLen,
+						attrs[1].value, attrs[1].valueLen);
+				if (!key_data) {
+					printf("generate_fake_private_ec_key failed \n");
+					ret = APP_SKR_ERR;
+					goto cleanup;
+				}
+
+				fptr = fopen(file_name, "wb");
+				if (fptr == NULL) {
+					printf("File does not exists\n");
+					ret = APP_SKR_ERR;
+					goto cleanup;
+				}
+
+				fwrite(key_data, sizeof(char), strlen(key_data), fptr);
 				break;
 			default:
 				break;
@@ -818,7 +965,63 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 				fwrite(key_data, sizeof(char), strlen(key_data), fptr);
 				break;
 			case SKK_EC:
-				printf("EC Writing not supported\n");
+				attrs[0].type = SK_ATTR_POINT;
+				attrs[0].value = NULL;
+				attrs[0].valueLen = 0;
+
+				sk_ret = SK_GetObjectAttribute(hObject, attrs, 1);
+				if (sk_ret != SKR_OK) {
+					if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
+						printf("\nObject Handle[%d] not found.\n", hObject);
+					else
+						printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
+
+					ret = APP_SKR_ERR;
+					goto end;
+				}
+
+				ret = APP_OK;
+				for (i = 0; i < 1; i++) {
+					if ((int16_t)(attrs[i].valueLen) != -1) {
+						attrs[i].value =
+							(void *)malloc(attrs[i].valueLen);
+
+						if (!attrs[i].value) {
+							printf("malloc failed ATTR[%d].Value\n", i);
+							ret = APP_MALLOC_FAIL;
+							goto end;
+						}
+					}
+				}
+
+				sk_ret = SK_GetObjectAttribute(hObject, attrs, 1);
+				if (sk_ret != SKR_OK) {
+					printf("Failed to Get Attribute Values.\n");
+					ret = APP_SKR_ERR;
+					goto end;
+				}
+
+
+				obj_id = getOptVal->obj_id;
+				file_name = getOptVal->write_to_file;
+
+				key_data = generate_fake_private_ec_key(OBJ_sn2nid(getOptVal->curve), obj_id,
+						attrs[0].value, attrs[0].valueLen,
+						attrs[1].value, attrs[1].valueLen);
+				if (!key_data) {
+					printf("generate_fake_private_ec_key failed \n");
+					ret = APP_SKR_ERR;
+					goto end;
+				}
+
+				fptr = fopen(file_name, "wb");
+				if (fptr == NULL) {
+					printf("File does not exists\n");
+					ret = APP_SKR_ERR;
+					goto end;
+				}
+
+				fwrite(key_data, sizeof(char), strlen(key_data), fptr);
 				break;
 			default:
 				break;

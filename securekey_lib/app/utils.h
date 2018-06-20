@@ -17,6 +17,7 @@ typedef struct {
 } rsa_3form_key_t;
 
 typedef struct {
+	int curve_nid;
 	uint8_t *params;
 	uint16_t params_len;
 	uint8_t *public_point;
