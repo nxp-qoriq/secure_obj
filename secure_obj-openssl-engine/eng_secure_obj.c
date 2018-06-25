@@ -16,12 +16,12 @@
 #include <openssl/engine.h>
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
-#include <crypto/evp/evp_locl.h>
 #include <openssl/evp.h>
 #include <openssl/ossl_typ.h>
 #include <openssl/crypto.h>
 #include <openssl/pem.h>
 
+#include <openssl/ecdsa.h>
 #include <openssl/hmac.h>
 #include <openssl/md5.h>
 #include <openssl/rand.h>
@@ -54,8 +54,244 @@ static const char *engine_id = "eng_secure_obj";
 static const char *engine_name = "Secure Object OpenSSL Engine.";
 
 static RSA_METHOD secureobj_rsa;
+static ECDSA_METHOD *secureobj_ec;
 
 #define	MAX_SEC_OBJECTS	50
+
+static int secure_obj_ec_sign_setup (EC_KEY *eckey, BN_CTX *ctx,
+			BIGNUM **kinv, BIGNUM **r)
+{
+	return 1;
+}
+static ECDSA_SIG *secure_obj_ec_sign (const unsigned char *dgst, int dgst_len,
+			const BIGNUM *inv, const BIGNUM *rp,
+			EC_KEY *eckey)
+{
+	int i = 0, j = 0, priv_key_len = 0, ret = 0;
+	SK_RET_CODE sk_ret = 0;
+	SK_MECHANISM_INFO mechType = {0};
+	SK_ATTRIBUTE attrs[3];
+	SK_OBJECT_HANDLE hObject = 0xFFFF, temp_hObject[MAX_SEC_OBJECTS];
+	SK_OBJECT_TYPE obj_type;
+	SK_KEY_TYPE key_type;
+	uint32_t objCount, key_index;
+	const BIGNUM 	*ec_priv_key = NULL;
+	uint32_t sobj_key_id[2] = { 0, 0 };
+	char *priv_key = NULL;
+	char *priv_key_temp = NULL;
+	const EC_POINT *ec_pub_key = NULL;
+	unsigned char *ec_pub_key_oct = NULL;
+	int ec_pub_key_oct_len = 0;
+	SK_MECHANISM_INFO signType = {0};
+	uint8_t *signature = NULL;
+	uint16_t signature_len = 0, signature_len_bytes = 0;;
+	ECDSA_SIG *ec_sig = NULL;
+	BIGNUM *bn_r, *bn_s;
+	EC_KEY *dup_eckey = NULL;
+
+	ec_priv_key = EC_KEY_get0_private_key(eckey);
+	if (!ec_priv_key) {
+		print_error("EC_KEY_get0_private_key failed\n");
+		ret = -1;
+		goto failure;
+	}
+
+	priv_key_len = BN_num_bytes(ec_priv_key);
+	priv_key = malloc(priv_key_len);
+	if (!priv_key) {
+		print_error("malloc failed for priv_key\n");
+		ret = -1;
+		goto failure;
+	}
+
+	priv_key_temp = priv_key;
+	BN_bn2bin(ec_priv_key, priv_key);
+
+	for (j = 0; j<2; j++) {
+		for (i = 5;i<9;i++) {
+			sobj_key_id[j] |=priv_key[priv_key_len - i - (j * 4)] << 8 * (i - 5);
+		}
+	}
+
+	if (!(((unsigned int)sobj_key_id[0] == (unsigned int)SOBJ_KEY_ID) &&
+		((unsigned int)sobj_key_id[1] == (unsigned int)SOBJ_KEY_ID))) {
+		print_info("Not a valid Secure Object Key, passing control to OpenSSL Function\n");
+		ret = -2;
+		goto send_to_openssl;
+	}
+
+	key_index = priv_key[priv_key_len - 1];
+	ec_pub_key = EC_KEY_get0_public_key(eckey);
+	if (!ec_pub_key) {
+		print_error("EC_KEY_get0_public_key failed\n");
+		ret = -1;
+		goto failure;
+	}
+
+	ec_pub_key_oct_len = i2o_ECPublicKey(eckey, &ec_pub_key_oct);
+	if (ec_pub_key_oct_len <= 0) {
+		long err;
+		err = ERR_get_error();
+		print_error("%s\n",ERR_error_string(err, NULL));
+		print_error("EC_KEY_get0_public_key failed\n");
+		ret = -1;
+		goto failure;
+	}
+
+	obj_type = SK_KEY_PAIR;
+	key_type = SKK_EC;
+
+	attrs[0].type = SK_ATTR_OBJECT_TYPE;
+	attrs[0].value = &obj_type;
+	attrs[0].valueLen = sizeof(SK_OBJECT_TYPE);
+
+	attrs[1].type = SK_ATTR_KEY_TYPE;
+	attrs[1].value = &key_type;
+	attrs[1].valueLen = sizeof(SK_KEY_TYPE);
+
+	attrs[2].type = SK_ATTR_OBJECT_INDEX;
+	attrs[2].value = (void *)&key_index;
+	attrs[2].valueLen = sizeof(uint32_t);
+
+	sk_ret = SK_EnumerateObjects(attrs, 3, temp_hObject, MAX_SEC_OBJECTS, &objCount);
+	if (sk_ret != SKR_OK) {
+		print_error("SK_EnumerateObjects failed with code = 0x%x\n", sk_ret);
+		ret = -1;
+		memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
+		goto failure;
+	}
+
+	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
+	if (objCount == 0) {
+		print_error("No object found\n");
+		ret = -1;
+		goto failure;
+	}
+
+	for (i = 0; i < objCount; i++) {
+		memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
+		attrs[0].type = SK_ATTR_POINT;
+		attrs[0].value = NULL;
+		attrs[0].valueLen = 0;
+
+		sk_ret = SK_GetObjectAttribute(temp_hObject[i], attrs, 1);
+		if (sk_ret != SKR_OK) {
+			print_error("SK_GetObjectAttribute failed for object %u with code = 0x%x\n",
+				temp_hObject[i], sk_ret);
+			continue;
+		}
+
+		if ((int16_t)(attrs[0].valueLen) != -1) {
+			attrs[0].value =
+				(void *)malloc(attrs[0].valueLen);
+			if (!attrs[0].value) {
+				print_error("malloc failed ATTR[%d].Value\n", i);
+				ret = -1;
+				goto failure;
+			}
+		}
+
+		sk_ret = SK_GetObjectAttribute(temp_hObject[i], attrs, 1);
+		if (sk_ret != SKR_OK) {
+			print_error("SK_GetObjectAttribute failed for object %u with code = 0x%x\n",
+				temp_hObject[i], sk_ret);
+			continue;
+		}
+
+		if (!memcmp(attrs[0].value, ec_pub_key_oct, ec_pub_key_oct_len)) {
+			print_info("got the match\n");
+			hObject = temp_hObject[i];
+			free(attrs[0].value);
+			break;
+		}
+	}
+
+	if (hObject == 0xFFFF) {
+		print_error("Key Correponding to pem passed is not present in HSM\n");
+		ret = -1;
+		goto failure;
+	}
+
+	signType.mechanism = SKM_ECDSA_SHA1;
+	sk_ret = SK_Sign(&signType, hObject, dgst, dgst_len,
+			NULL, &signature_len);
+	if (sk_ret != SKR_OK) {
+		print_error("SK_Sign failed with ret code 0x%x\n", ret);
+		ret = -1;
+		goto failure;
+	}
+
+	signature_len_bytes = signature_len/8;
+	signature = malloc(2 * signature_len_bytes);
+	if (!signature) {
+		print_error("malloc failed for signature\n");
+		ret = -1;
+		goto failure;
+	}
+
+	sk_ret = SK_Sign(&signType, hObject, dgst, dgst_len,
+			signature, &signature_len);
+	if (sk_ret != SKR_OK) {
+		print_error("SK_Sign failed with ret code 0x%x\n", ret);
+		ret = -1;
+		goto failure;
+	}
+
+	ec_sig = ECDSA_SIG_new();
+	if (!ec_sig) {
+		print_error("ECDSA_SIG_new failed\n");
+		ret = -1;
+		goto failure;
+	}
+
+	bn_r = ec_sig->r;
+	bn_s = ec_sig->s;
+
+	BN_bin2bn(signature, signature_len_bytes/2, bn_r);
+	BN_bin2bn(signature + (signature_len_bytes/2), signature_len_bytes/2, bn_s);
+
+send_to_openssl:
+	if (ret == -2) {
+		dup_eckey = EC_KEY_dup(eckey);
+
+	                /* Attach OpenSSL's ECDSA methods to duplicate key */
+		ECDSA_set_method(dup_eckey, ECDSA_OpenSSL());
+
+	                /* Invoke OpenSSL verify and return result */
+		ec_sig = ECDSA_do_sign_ex(dgst, dgst_len, inv, rp, dup_eckey);
+	                EC_KEY_free(dup_eckey);
+	}
+
+failure:
+	if (priv_key_temp)
+		free(priv_key_temp);
+
+	if (signature)
+		free(signature);
+
+	return ec_sig;
+}
+
+static int secure_obj_ec_verify(const unsigned char *dgst, int dgst_len,
+			const ECDSA_SIG *sig, EC_KEY *eckey)
+{
+	EC_KEY *dup_eckey = NULL;
+	int ret = 0;
+
+	dup_eckey = EC_KEY_dup(eckey);
+                /* Attach OpenSSL's ECDSA methods to duplicate key */
+                if (!ECDSA_set_method(dup_eckey, ECDSA_OpenSSL())) {
+		print_error("OpenSSL verify API ECDSA_set_method failure..\n");
+		goto done;
+                }
+
+                /* Invoke OpenSSL verify and return result */
+	ret = ECDSA_do_verify(dgst, dgst_len, sig, dup_eckey);
+	EC_KEY_free(dup_eckey);
+
+done:
+                return ret;
+}
 
 static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
                          unsigned char *to, RSA *rsa, int padding)
@@ -433,6 +669,17 @@ static int bind(ENGINE *engine, const char *id)
 {
 	int ret = 0;
 
+	secureobj_ec = ECDSA_METHOD_new(NULL);
+	if (secureobj_ec == NULL)
+		return 0;
+
+	ECDSA_METHOD_set_name(secureobj_ec, "Secure Object ECDSA Method");
+	ECDSA_METHOD_set_sign(secureobj_ec, secure_obj_ec_sign);
+	ECDSA_METHOD_set_sign_setup(secureobj_ec, secure_obj_ec_sign_setup);
+	ECDSA_METHOD_set_verify(secureobj_ec, secure_obj_ec_verify);
+	ECDSA_METHOD_set_flags(secureobj_ec, 0);
+	ECDSA_METHOD_set_app_data(secureobj_ec, NULL);
+
 	if (!ENGINE_set_id(engine, engine_id) ||
 		!ENGINE_set_name(engine, engine_name)) {
 		print_error("ENGINE_set_id or ENGINE_set_name or ENGINE_set_init_function failed\n");
@@ -462,8 +709,8 @@ static int bind(ENGINE *engine, const char *id)
 		goto end;
 	}
 
-	if (!ENGINE_set_default_RSA(engine)) {
-		print_error("ENGINE_set_default_RSA failed\n");
+	if (!ENGINE_set_ECDSA(engine, secureobj_ec)) {
+		print_error("ENGINE_set_ECDSA  failed\n");
 		goto end;
 	}
 
