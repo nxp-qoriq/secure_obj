@@ -64,10 +64,11 @@ void fill_ec_keypair_tee_attr(SK_ATTRIBUTE *attrs, uint32_t attr_count,
 
 	attr_key = TA_GetSKAttr(SK_ATTR_POINT, attrs, attr_count);
 	if (attr_key != NULL) {
-		if (obj_size == 256)
-			point_len = 32;
-		else
-			point_len = 48;
+		point_len = obj_size/8;
+
+		/* Since EC Public key coming from Secure Key Library is
+		  * in uncompressed octet format, so actual public key will
+		  * start from 1 index */
 		public_key_x = ((uint8_t *)attr_key->value) + 1;
 		public_key_y = public_key_x + point_len;
 		TEE_InitRefAttribute(&tee_attrs[1],
@@ -83,10 +84,12 @@ void fill_ec_keypair_tee_attr(SK_ATTRIBUTE *attrs, uint32_t attr_count,
 		TEE_InitValueAttribute(&tee_attrs[3], TEE_ATTR_ECC_CURVE,
 				     TEE_ECC_CURVE_NIST_P256, sizeof(int));
 		attr_cnt++;
-	} else {
+	} else if (obj_size == 384) {
 		TEE_InitValueAttribute(&tee_attrs[3], TEE_ATTR_ECC_CURVE,
 				     TEE_ECC_CURVE_NIST_P384, sizeof(int));
 		attr_cnt++;
+	} else {
+		EMSG("Algo Not Supported\n");
 	}
 
 
@@ -104,14 +107,14 @@ void fill_ec_pubkey_tee_attr(SK_ATTRIBUTE *attrs, uint32_t attr_count,
 	if (obj_size == 256) {
 		TEE_InitValueAttribute(&tee_attrs[0], TEE_ATTR_ECC_CURVE,
 				     TEE_ECC_CURVE_NIST_P256, sizeof(int));
-		point_len = 32;
 		attr_cnt++;
 	} else {
 		TEE_InitValueAttribute(&tee_attrs[0], TEE_ATTR_ECC_CURVE,
 				     TEE_ECC_CURVE_NIST_P384, sizeof(int));
-		point_len = 48;
 		attr_cnt++;
 	}
+
+	point_len = obj_size/8;
 
 	attr_key = TA_GetSKAttr(SK_ATTR_POINT, attrs, attr_count);
 	if (attr_key != NULL) {

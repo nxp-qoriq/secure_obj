@@ -99,8 +99,8 @@ typedef SK_TYPE SK_ATTRIBUTE_TYPE;
 #define SK_ATTR_COEFFICIENT		38 /* Big integer CRT coefficient q-1 mod p */
 
 /* Attributes For ECC Key Pair */
-#define SK_ATTR_PARAMS			50 /* OID of curve */
-#define SK_ATTR_POINT			51 /* Public point */
+#define SK_ATTR_PARAMS			50 /* DER encoding of namedcurve */
+#define SK_ATTR_POINT			51 /* Public point in octet uncompressed format */
 #define SK_ATTR_PRIV_VALUE		52 /* Private Value */
 
 /*

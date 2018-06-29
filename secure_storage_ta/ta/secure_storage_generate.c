@@ -65,10 +65,15 @@ static TEE_Result TA_GenerateECKeyPair(TEE_ObjectHandle *tObject,
 	if (obj_size == 256) {
 		TEE_InitValueAttribute(&curve_attr, TEE_ATTR_ECC_CURVE,
 				     TEE_ECC_CURVE_NIST_P256, sizeof(int));
-	} else {
+	} else if (obj_size == 384) {
 		TEE_InitValueAttribute(&curve_attr, TEE_ATTR_ECC_CURVE,
 				     TEE_ECC_CURVE_NIST_P384, sizeof(int));
+	} else {
+		EMSG("Algo Not Supported\n");
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto out;
 	}
+
 	key_attr_cnt++;
 
 	DMSG("Generate EC key pair!\n");

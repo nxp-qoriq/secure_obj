@@ -89,6 +89,9 @@ static ECDSA_SIG *secure_obj_ec_sign (const unsigned char *dgst, int dgst_len,
 	BIGNUM *bn_r, *bn_s;
 	EC_KEY *dup_eckey = NULL;
 
+	/* Here we are getting the private key to find the object id
+	  * which we encoded into private key while creating the key
+	  */
 	ec_priv_key = EC_KEY_get0_private_key(eckey);
 	if (!ec_priv_key) {
 		print_error("EC_KEY_get0_private_key failed\n");
@@ -121,6 +124,11 @@ static ECDSA_SIG *secure_obj_ec_sign (const unsigned char *dgst, int dgst_len,
 	}
 
 	key_index = priv_key[priv_key_len - 1];
+
+	/* Getting the EC Public key to match with public key of Secure
+	  * key, because there may be the case where more than one
+	  * jey is having the same key id.
+	  */
 	ec_pub_key = EC_KEY_get0_public_key(eckey);
 	if (!ec_pub_key) {
 		print_error("EC_KEY_get0_public_key failed\n");
@@ -275,6 +283,9 @@ failure:
 static int secure_obj_ec_verify(const unsigned char *dgst, int dgst_len,
 			const ECDSA_SIG *sig, EC_KEY *eckey)
 {
+	/* Here verification is done via openssl software implementation
+	  * to check the interoperability.
+	  */
 	EC_KEY *dup_eckey = NULL;
 	int ret = 0;
 
