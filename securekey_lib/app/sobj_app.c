@@ -47,7 +47,7 @@ int import_ec_key(char *ec_file, ec_key_t **ec_key_ret)
 	ec_key_t *ec_key_st;
 	int ec_key_len, ec_priv_len, der_enc_size;
 	const char *sname;
-	unsigned char *pubkey_oct, *ec_params_der, *ec_params_der_temp;
+	unsigned char *pubkey_oct = NULL, *ec_params_der, *ec_params_der_temp;
 	int curve_nid = 0;
 	int total_len, pubkey_oct_len, octet_len;
 
@@ -359,7 +359,6 @@ char *generate_fake_private_ec_key (int curve, uint32_t obj_id,
 	uint32_t *priv_key = NULL, priv_key_len  = 0;
 	unsigned char *priv_key_temp = NULL;
 	EC_KEY		*ec_key  = NULL;
-	EVP_PKEY	*pkey   = NULL;
 	EC_POINT	*ec_point = NULL;
 	const BIGNUM 	*ec_priv_key = NULL;
 	int ec_curve_nid;
@@ -433,8 +432,6 @@ char *generate_fake_private_ec_key (int curve, uint32_t obj_id,
 end:
 	if (out)
 		BIO_free(out);
-	if (pkey)
-		EVP_PKEY_free(pkey);
 	if (ec_key)
 		EC_KEY_free(ec_key);
 
@@ -580,7 +577,7 @@ static int do_CreateObject(struct getOptValue *getOptVal)
 	FILE *fptr = NULL;
 	char *key_data = NULL, *file_name = NULL;
 	rsa_3form_key_t rsa_3form_key;
-	ec_key_t *ec_key;
+	ec_key_t *ec_key = NULL;
 
 	switch (getOptVal->key_type) {
 		case SKK_RSA:
@@ -1024,7 +1021,7 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 				fwrite(key_data, sizeof(char), strlen(key_data), fptr);
 				break;
 			default:
-				break;
+				printf("Unsupported Key type\n");
 		}
 	}
 end:
