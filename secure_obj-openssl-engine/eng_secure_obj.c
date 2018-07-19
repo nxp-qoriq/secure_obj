@@ -720,6 +720,11 @@ static int bind(ENGINE *engine, const char *id)
 		goto end;
 	}
 
+	if (!ENGINE_set_default_RSA(engine)) {
+		print_error("ENGINE_set_default_RSA failed\n");
+		goto end;
+	}
+
 	if (!ENGINE_set_ECDSA(engine, secureobj_ec)) {
 		print_error("ENGINE_set_ECDSA  failed\n");
 		goto end;
