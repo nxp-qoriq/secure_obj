@@ -186,7 +186,11 @@ int generate_rsa_key(rsa_3form_key_t *rsa_3form_key, struct getOptValue *getOptV
 			ret = APP_PEM_READ_ERROR;
 			goto cleanup;
 		}
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 		getOptVal->key_len = BN_num_bits(rsa->n);
+#else
+		getOptVal->key_len = RSA_bits(rsa);
+#endif
 		printf("Key Length = %d\n", getOptVal->key_len);
 
 	} else {
@@ -225,6 +229,7 @@ int generate_rsa_key(rsa_3form_key_t *rsa_3form_key, struct getOptValue *getOptV
 		ret = APP_OK;
 	}
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	BN_bn2bin(rsa->n, rsa_3form_key->rsa_modulus);
 	BN_bn2bin(rsa->e, rsa_3form_key->rsa_pub_exp);
 	BN_bn2bin(rsa->d, rsa_3form_key->rsa_priv_exp);
@@ -233,7 +238,20 @@ int generate_rsa_key(rsa_3form_key_t *rsa_3form_key, struct getOptValue *getOptV
 	BN_bn2bin(rsa->dmp1, rsa_3form_key->rsa_exp1);
 	BN_bn2bin(rsa->dmq1, rsa_3form_key->rsa_exp2);
 	BN_bn2bin(rsa->iqmp, rsa_3form_key->rsa_coeff);
-
+#else
+	const BIGNUM *bn_n, *bn_e, *bn_d, *bn_p, *bn_q, *bn_dmp1, *bn_dmq1, *bn_iqmp;
+	RSA_get0_key(rsa, &bn_n, &bn_e, &bn_d);
+	RSA_get0_factors(rsa, &bn_p, &bn_q);
+	RSA_get0_crt_params(rsa, &bn_dmp1, &bn_dmq1, &bn_iqmp);
+	BN_bn2bin(bn_n, rsa_3form_key->rsa_modulus);
+	BN_bn2bin(bn_e, rsa_3form_key->rsa_pub_exp);
+	BN_bn2bin(bn_d, rsa_3form_key->rsa_priv_exp);
+	BN_bn2bin(bn_p, rsa_3form_key->rsa_prime1);
+	BN_bn2bin(bn_q, rsa_3form_key->rsa_prime2);
+	BN_bn2bin(bn_dmp1, rsa_3form_key->rsa_exp1);
+	BN_bn2bin(bn_dmq1, rsa_3form_key->rsa_exp2);
+	BN_bn2bin(bn_iqmp, rsa_3form_key->rsa_coeff);
+#endif
 cleanup:
 	if (bp_public)
 		BIO_free_all(bp_public);
@@ -443,6 +461,7 @@ char *generate_fake_private_RSA_key (int key_size, uint32_t obj_id,
 {
 	char *key_data = NULL, *priv_key_exp_temp = NULL;
 	uint32_t *priv_key_exp = NULL, priv_key_len  = 0;
+	BIGNUM *bn_n = NULL, *bn_e = NULL, *bn_d_temp = NULL, *bn_d = NULL;
 	int i = 0, j = 0;
 
 	RSA *rsa = RSA_new();
@@ -460,14 +479,14 @@ char *generate_fake_private_RSA_key (int key_size, uint32_t obj_id,
 	BN_set_word(bn, 0x10001);
 	RSA_generate_key_ex(rsa, key_size, bn, NULL);
 
-	rsa->e = BN_bin2bn(pub_exp, pub_exp_len, rsa->e);
-	if (!rsa->e) {
+	bn_e = BN_bin2bn(pub_exp, pub_exp_len, bn_e);
+	if (!bn_e) {
 		printf("BN_bin2bn failed for pub exp\n");
 		goto end;
 	}
 
-	rsa->n = BN_bin2bn(modulus, modulus_len, rsa->n);
-	if (!rsa->n) {
+	bn_n = BN_bin2bn(modulus, modulus_len, bn_n);
+	if (!bn_n) {
 		printf("BN_bin2bn failed for modulus\n");
 		goto end;
 	}
@@ -479,10 +498,14 @@ char *generate_fake_private_RSA_key (int key_size, uint32_t obj_id,
 		goto end;
 	}
 
-	BN_bn2bin(rsa->d, priv_key_exp_temp);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	bn_d_temp = rsa->d;
+#else
+	RSA_get0_key(rsa, NULL, NULL, (const BIGNUM **)&bn_d_temp);
+#endif
+	BN_bn2bin(bn_d_temp, priv_key_exp_temp);
 
 	priv_key_exp_temp[0] = 0x10;
-
 	priv_key_exp = (uint32_t *)priv_key_exp_temp;
 
 #if 0
@@ -506,28 +529,51 @@ char *generate_fake_private_RSA_key (int key_size, uint32_t obj_id,
 	}
 #endif
 
-	rsa->d = BN_bin2bn((char *)priv_key_exp, priv_key_len, rsa->d);
-	if (!rsa->d) {
+	bn_d = BN_bin2bn((char *)priv_key_exp, priv_key_len, bn_d);
+	if (!bn_d) {
 		printf("BN_bin2bn failed for priv exp\n");
 		goto end;
 	}
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	rsa->e = bn_e;
+	rsa->n = bn_n;
+	rsa->d = bn_d;
+#else
+	if (!RSA_set0_key(rsa, bn_n, bn_e, bn_d)) {
+		printf("RSA_set0_key failed\n");
+		goto end;
+	}
+#endif
 	BIO *out = BIO_new(BIO_s_mem());
 	if (!out) {
 		printf("BIO_new failed\n");
 		goto end;
 	}
 
-	PEM_write_bio_RSAPrivateKey(out, rsa, NULL, NULL, 0, NULL, NULL);
-	key_data = (char *)copy_bio_data(out, NULL);
+	if (!PEM_write_bio_RSAPrivateKey(out, rsa, NULL, NULL, 0, NULL, NULL)) {
+		printf("PEM_write_bio_RSAPrivateKey failed\n");
+		goto end;
+	}
 
+	key_data = (char *)copy_bio_data(out, NULL);
 end:
 	if (out)
 		BIO_free(out);
 	if (bn)
 		BN_free(bn);
-	if (rsa)
+	if (rsa) {
 		RSA_free(rsa);
+		bn_n= NULL;
+		bn_e = NULL;
+		bn_d = NULL;
+	}
+	if (bn_n)
+		BN_free(bn_n);
+	if (bn_e)
+		BN_free(bn_e);
+	if (bn_d)
+		BN_free(bn_d);
 	if (priv_key_exp)
 		free(priv_key_exp);
 	return (key_data);

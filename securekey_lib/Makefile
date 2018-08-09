@@ -78,7 +78,7 @@ mp_app:
 
 mp_verify:
 	@echo "Building Secure MP Feature Verification APP"
-	$(VPREFIX)$(CC) -Iinclude/ -I$(OPENSSL_PATH)/include -o app/mp_verify app/mp_verify.c -L$(OPENSSL_PATH) -lssl -lcrypto $(SECUREKEY_LFLAGS)
+	$(VPREFIX)$(CC) -g -Iinclude/ -I$(OPENSSL_PATH)/include -o app/mp_verify app/mp_verify.c -L$(OPENSSL_PATH) -lssl -lcrypto $(SECUREKEY_LFLAGS)
 	mv app/mp_verify ${EXPORT_DIR}/app
 
 install:

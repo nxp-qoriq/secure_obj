@@ -106,6 +106,7 @@ uint8_t verify_signature(const char *pub_key_file, const char *sig_file,
 	uint32_t *mtag_temp;
 	uint8_t pub_key_len, sign_len, mtag_len, msg_len;
 	int i = 0, total_sz;
+	BIGNUM *bn_r = NULL, *bn_s = NULL;
 
 	pub_key_len = 64;
 	sign_len = 64;
@@ -120,7 +121,7 @@ uint8_t verify_signature(const char *pub_key_file, const char *sig_file,
 	if (!temp) {
 		printf("malloc failed\n");
 		ret = -1;
-		goto err;
+		goto end;
 	}
 
 	pub_key = temp;
@@ -135,34 +136,34 @@ uint8_t verify_signature(const char *pub_key_file, const char *sig_file,
 	if (ret) {
 		printf("fill_data_from_file failed\n");
 		ret = -1;
-		goto err1;
+		goto end;
 	}
 
 	/* Making the OpenSSL structures to verify the signature uisng
 	* OpenSSL to check the interoperability
 	* Init empty OpenSSL EC keypair of prime256*/
 	EC_KEY *eckey = EC_KEY_new_by_curve_name(NID_X9_62_prime256v1);
-	BIGNUM *X;
-	BIGNUM *Y;
+	BIGNUM *X = NULL;
+	BIGNUM *Y = NULL;
 
 	/*X co-ordinate of pub key*/
 	if ((X = BN_new()) == NULL) {
 		printf("BN_new failed for X\n");
 		ret = -1;
-		goto err1;
+		goto end;
 	}
 
 	if (NULL == BN_bin2bn(pub_key, 32, X)) {
 		printf("BN_bin2bn failed for X\n");
 		ret = -1;
-		goto err2;
+		goto end;
 	}
 
 	/*Y coordinate of public key*/
 	if ((Y = BN_new()) == NULL) {
 		printf("BN_new failed for Y\n");
 		ret = -1;
-		goto err2;
+		goto end;
 	}
 
 	/* Since we saved the pub_key in format of x followed by y,
@@ -172,14 +173,32 @@ uint8_t verify_signature(const char *pub_key_file, const char *sig_file,
 	if (NULL == BN_bin2bn(pub_key + 32, 32, Y)) {
 		printf("BN_bin2bn failed for Y\n");
 		ret = -1;
-		goto err3;
+		goto end;
 	}
 
 	/* Create an OpenSSL EC key using X and Y*/
 	if (EC_KEY_set_public_key_affine_coordinates(eckey, X, Y) != 1) {
 		printf("EC key generation failed\n");
 		ret = -1;
-		goto err3;
+		goto end;
+	}
+
+	bn_r = BN_bin2bn(sign, 32, bn_r);
+	if (!bn_r) {
+		printf("BN_bin2bn failed for signature->r\n");
+		ret = -1;
+		goto end;
+	}
+
+	/* Since we saved the signature in format of r followed by s,
+	  * so data read from file will be having first 32 bytes of r and
+	  * next 32 bytes of r component of Signature.
+	  */
+	bn_s = BN_bin2bn(sign + 32, 32, bn_s);
+	if (!bn_s) {
+		printf("BN_bin2bn failed for signature->s\n");
+		ret = -1;
+		goto end;
 	}
 
 	/* Creating a new OpenSSL Signature structure from data read from
@@ -187,34 +206,16 @@ uint8_t verify_signature(const char *pub_key_file, const char *sig_file,
 	  */
 	ECDSA_SIG *signature = ECDSA_SIG_new();
 
-	signature->r = BN_new();
-	if (signature->r == NULL) {
-		printf("BN_new failed for signature->r\n");
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	signature->r = bn_r;
+	signature->s = bn_s;
+#else
+	if (!ECDSA_SIG_set0(signature, bn_r, bn_s)) {
+		printf("ECDSA_SIG_set0 failed\n");
 		ret = -1;
-		goto err4;
+		goto end;
 	}
-	if (NULL == BN_bin2bn(sign, 32, signature->r)) {
-		printf("BN_bin2bn failed for signature->r\n");
-		ret = -1;
-		goto err5;
-	}
-
-
-	if ((signature->s = BN_new()) == NULL) {
-		printf("BN_new failed for signature->s\n");
-		ret = -1;
-		goto err5;
-	}
-	/* Since we saved the signature in format of r followed by s,
-	  * so data read from file will be having first 32 bytes of r and
-	  * next 32 bytes of r component of Signature.
-	  */
-	if (NULL == BN_bin2bn(sign + 32, 32, signature->s)) {
-		printf("BN_bin2bn failed for signature->s\n");
-		ret = -1;
-		goto err6;
-	}
-
+#endif
 	/* Since CAAM calculated the hash after prepending the Msg with
 	  * Mtag, So here allocating a temporary buffer to copy the msg and
 	  * mtag in same buffer for Hash calculation */
@@ -223,7 +224,7 @@ uint8_t verify_signature(const char *pub_key_file, const char *sig_file,
 	if (!mp_temp) {
 		printf("malloc failed\n");
 		ret = -1;
-		goto err6;
+		goto end;
 	}
 
 	/* Prepending the mtag before msg for hash calculation */
@@ -250,26 +251,31 @@ uint8_t verify_signature(const char *pub_key_file, const char *sig_file,
 	} else {
 		printf("Not Verified EC Signature\n");
 		ret = -1;
-		goto err7;
+		goto end;
 	}
 
 	ret = 0;
 
-err7:
-	free(mp_temp);
-err6:
-	BN_free(signature->s);
-err5:
-	BN_free(signature->r);
-err4:
-	EC_KEY_free(eckey);
-err3:
-	BN_free(Y);
-err2:
-	BN_free(X);
-err1:
-	free(temp);
-err:
+end:
+	if (mp_temp)
+		free(mp_temp);
+	if (signature) {
+		ECDSA_SIG_free(signature);
+		bn_s = NULL;
+		bn_r = NULL;
+	}
+	if (bn_s)
+		BN_free(bn_s);
+	if (bn_r)
+		BN_free(bn_r);
+	if (eckey)
+		EC_KEY_free(eckey);
+	if (Y)
+		BN_free(Y);
+	if (X)
+		BN_free(X);
+	if (temp)
+		free(temp);
 	return ret;
 }
 

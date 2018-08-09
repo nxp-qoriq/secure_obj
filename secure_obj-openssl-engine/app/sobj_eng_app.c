@@ -12,6 +12,7 @@
 #include <openssl/engine.h>
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 int padding = RSA_PKCS1_PADDING;
 
@@ -59,6 +60,7 @@ int main(int argc, char *argv[])
 	EVP_PKEY *priv_key = NULL;
 	ENGINE *eng = NULL;
 	FILE *fptr = NULL;
+	RSA *rsa = NULL;
 
 	if (argc <= 1) {
 		printf("Please give the label of Private Key to be used\n");
@@ -105,7 +107,13 @@ int main(int argc, char *argv[])
 	}
 #endif
 
-	byte_key_size = RSA_size(priv_key->pkey.rsa);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	rsa = priv_key->pkey.rsa;
+#else
+	rsa = EVP_PKEY_get0_RSA(priv_key);
+#endif
+
+	byte_key_size = RSA_size(rsa);
 
 	encrypted = malloc(byte_key_size);
 	if (!encrypted) {
@@ -127,7 +135,7 @@ int main(int argc, char *argv[])
 
 	printf("Plain Text = %s\n", plainText);
 	printf("Starting RSA Public Encrypt....\n");
-	encrypted_length = public_encrypt(plainText, plain_text_len, priv_key->pkey.rsa, encrypted);
+	encrypted_length = public_encrypt(plainText, plain_text_len, rsa, encrypted);
 	if(encrypted_length == -1) {
 		printLastError("Public Encrypt failed ");
 		ret = 1;
@@ -136,7 +144,7 @@ int main(int argc, char *argv[])
 	printf("Encryption Complete: Length of Encrypted Data = %d\n\n", encrypted_length);
 
 	printf("Starting RSA Private Decryption....\n");
-	decrypted_length = private_decrypt(encrypted, encrypted_length, priv_key->pkey.rsa, decrypted);
+	decrypted_length = private_decrypt(encrypted, encrypted_length, rsa, decrypted);
 	if(decrypted_length == -1) {
 		printLastError("Private Decrypt failed ");
 		ret = 1;
@@ -146,7 +154,7 @@ int main(int argc, char *argv[])
 
 	printf("Starting RSA Private Encryption....\n");
 	printf("Plain Text = %s\n", plainText);
-	encrypted_length = private_encrypt(plainText, plain_text_len, priv_key->pkey.rsa, encrypted);
+	encrypted_length = private_encrypt(plainText, plain_text_len, rsa, encrypted);
 	if(encrypted_length == -1) {
 		printLastError("Private Encrypt failed");
 		ret = 1;
@@ -155,7 +163,7 @@ int main(int argc, char *argv[])
 	printf("Encryption Complete: Length of Encrypted Data = %d\n\n", encrypted_length);
 
 	printf("Starting RSA Public Decryption....\n");
-	decrypted_length = public_decrypt(encrypted, encrypted_length, priv_key->pkey.rsa, decrypted);
+	decrypted_length = public_decrypt(encrypted, encrypted_length, rsa, decrypted);
 	if(decrypted_length == -1) {
 		printLastError("Public Decrypt failed");
 		ret = 1;

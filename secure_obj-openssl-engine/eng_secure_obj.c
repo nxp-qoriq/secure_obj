@@ -21,11 +21,18 @@
 #include <openssl/crypto.h>
 #include <openssl/pem.h>
 
-#include <openssl/ecdsa.h>
 #include <openssl/hmac.h>
 #include <openssl/md5.h>
 #include <openssl/rand.h>
 #include <openssl/tls1.h>
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+#include <openssl/ecdsa.h>
+static ECDSA_METHOD *secureobj_ec = NULL;
+#else
+#include <openssl/ec.h>
+static EC_KEY_METHOD *secureobj_ec = NULL;
+#endif
 
 #include "securekey_api.h"
 
@@ -53,8 +60,7 @@ printf(msg, ##__VA_ARGS__); \
 static const char *engine_id = "eng_secure_obj";
 static const char *engine_name = "Secure Object OpenSSL Engine.";
 
-static RSA_METHOD secureobj_rsa;
-static ECDSA_METHOD *secureobj_ec;
+static RSA_METHOD *secureobj_rsa = NULL;
 
 #define	MAX_SEC_OBJECTS	50
 
@@ -252,21 +258,29 @@ static ECDSA_SIG *secure_obj_ec_sign (const unsigned char *dgst, int dgst_len,
 		goto failure;
 	}
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	bn_r = ec_sig->r;
 	bn_s = ec_sig->s;
-
+#else
+	ECDSA_SIG_get0(ec_sig, (const BIGNUM **)&bn_r,
+		(const BIGNUM **)&bn_s);
+#endif
 	BN_bin2bn(signature, signature_len_bytes/2, bn_r);
-	BN_bin2bn(signature + (signature_len_bytes/2), signature_len_bytes/2, bn_s);
+	BN_bin2bn(signature + (signature_len_bytes/2),
+		signature_len_bytes/2, bn_s);
 
 send_to_openssl:
 	if (ret == -2) {
 		dup_eckey = EC_KEY_dup(eckey);
-
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	                /* Attach OpenSSL's ECDSA methods to duplicate key */
 		ECDSA_set_method(dup_eckey, ECDSA_OpenSSL());
-
+#else
+		EC_KEY_set_method(dup_eckey, EC_KEY_OpenSSL());
+#endif
 	                /* Invoke OpenSSL verify and return result */
-		ec_sig = ECDSA_do_sign_ex(dgst, dgst_len, inv, rp, dup_eckey);
+		ec_sig = ECDSA_do_sign_ex(dgst, dgst_len, inv, rp,
+					dup_eckey);
 	                EC_KEY_free(dup_eckey);
 	}
 
@@ -290,12 +304,19 @@ static int secure_obj_ec_verify(const unsigned char *dgst, int dgst_len,
 	int ret = 0;
 
 	dup_eckey = EC_KEY_dup(eckey);
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
                 /* Attach OpenSSL's ECDSA methods to duplicate key */
-                if (!ECDSA_set_method(dup_eckey, ECDSA_OpenSSL())) {
+	if (!ECDSA_set_method(dup_eckey, ECDSA_OpenSSL())) {
 		print_error("OpenSSL verify API ECDSA_set_method failure..\n");
 		goto done;
-                }
-
+	}
+#else
+	if (!EC_KEY_set_method(dup_eckey, EC_KEY_OpenSSL())) {
+		print_error("OpenSSL verify API EC_KEY_set_method failure..\n");
+		goto done;
+	}
+#endif
                 /* Invoke OpenSSL verify and return result */
 	ret = ECDSA_do_verify(dgst, dgst_len, sig, dup_eckey);
 	EC_KEY_free(dup_eckey);
@@ -322,6 +343,7 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 	uint32_t rsa_key_len = 0;
 	char *priv_exp = NULL, *modulus = NULL;
 	uint32_t sobj_key_id[2] = { 0, 0 };
+	BIGNUM *bn_d = NULL, *bn_n = NULL;
 
 	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
 	memset(temp_hObject, 0, sizeof(SK_OBJECT_HANDLE) * MAX_SEC_OBJECTS);
@@ -341,8 +363,14 @@ static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
 		goto failure;
 	}
 
-	BN_bn2bin(rsa->d, priv_exp);
-	BN_bn2bin(rsa->n, modulus);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	bn_d = rsa->d;
+	bn_n = rsa->n;
+#else
+	RSA_get0_key(rsa, (const BIGNUM **)&bn_n, NULL, (const BIGNUM **)&bn_d);
+#endif
+	BN_bn2bin(bn_d, priv_exp);
+	BN_bn2bin(bn_n, modulus);
 
 	for (j = 0; j<2; j++) {
 		for (i = 5;i<9;i++) {
@@ -481,8 +509,14 @@ failure:
 	}
 
 	if (ret == -2) {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 		const RSA_METHOD *rsa_meth = RSA_PKCS1_SSLeay();
 		ret = rsa_meth->rsa_priv_enc(flen, from, to, rsa, padding);
+#else
+		const RSA_METHOD *rsa_meth = RSA_PKCS1_OpenSSL();
+		ret = (RSA_meth_get_priv_enc(rsa_meth))(flen, from, to,
+					rsa, padding);
+#endif
 	}
 
 	return ret;
@@ -506,6 +540,7 @@ static int secure_obj_rsa_priv_dec(int flen, const unsigned char *from,
 	uint32_t rsa_key_len = 0;
 	char *priv_exp = NULL, *modulus = NULL;
 	uint32_t sobj_key_id[2] = { 0, 0 };
+	BIGNUM *bn_d = NULL, *bn_n = NULL;
 
 	memset(attrs, 0, 3 * sizeof(SK_ATTRIBUTE));
 	memset(temp_hObject, 0, sizeof(SK_OBJECT_HANDLE) * MAX_SEC_OBJECTS);
@@ -525,8 +560,14 @@ static int secure_obj_rsa_priv_dec(int flen, const unsigned char *from,
 		goto failure;
 	}
 
-	BN_bn2bin(rsa->d, priv_exp);
-	BN_bn2bin(rsa->n, modulus);
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	bn_d = rsa->d;
+	bn_n = rsa->n;
+#else
+	RSA_get0_key(rsa, (const BIGNUM **)&bn_n, NULL, (const BIGNUM **)&bn_d);
+#endif
+	BN_bn2bin(bn_d, priv_exp);
+	BN_bn2bin(bn_n, modulus);
 
 	for (j = 0; j < 2; j++) {
 		for (i = 5; i < 9; i++) {
@@ -669,8 +710,14 @@ failure:
 	}
 
 	if (ret == -2) {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 		const RSA_METHOD *rsa_meth = RSA_PKCS1_SSLeay();
 		ret = rsa_meth->rsa_priv_dec(flen, from, to, rsa, padding);
+#else
+		const RSA_METHOD *rsa_meth = RSA_PKCS1_OpenSSL();
+		ret = (RSA_meth_get_priv_dec(rsa_meth))(flen, from, to,
+						rsa, padding);
+#endif
 	}
 
 	return ret;
@@ -680,9 +727,10 @@ static int bind(ENGINE *engine, const char *id)
 {
 	int ret = 0;
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
 	secureobj_ec = ECDSA_METHOD_new(NULL);
 	if (secureobj_ec == NULL)
-		return 0;
+		goto end;
 
 	ECDSA_METHOD_set_name(secureobj_ec, "Secure Object ECDSA Method");
 	ECDSA_METHOD_set_sign(secureobj_ec, secure_obj_ec_sign);
@@ -691,42 +739,95 @@ static int bind(ENGINE *engine, const char *id)
 	ECDSA_METHOD_set_flags(secureobj_ec, 0);
 	ECDSA_METHOD_set_app_data(secureobj_ec, NULL);
 
+	if (!ENGINE_set_ECDSA(engine, secureobj_ec)) {
+		print_error("ENGINE_set_ECDSA  failed\n");
+		goto end;
+	}
+
+	secureobj_rsa = malloc(sizeof(RSA_METHOD));
+	if (secureobj_rsa == NULL)
+		goto end;
+
+	memset(secureobj_rsa, 0, sizeof(RSA_METHOD));
+	if (ENGINE_set_RSA(engine, secureobj_rsa)) {
+		const RSA_METHOD *rsa_meth = RSA_PKCS1_SSLeay();
+
+		secureobj_rsa->name = "Secure Object RSA Method";
+		secureobj_rsa->rsa_pub_enc = rsa_meth->rsa_pub_enc;
+		secureobj_rsa->rsa_pub_dec = rsa_meth->rsa_pub_dec;
+		secureobj_rsa->rsa_priv_enc = secure_obj_rsa_priv_enc;
+		secureobj_rsa->rsa_priv_dec = secure_obj_rsa_priv_dec;
+		secureobj_rsa->rsa_mod_exp = rsa_meth->rsa_mod_exp;
+		secureobj_rsa->bn_mod_exp = rsa_meth->bn_mod_exp;
+		secureobj_rsa->init = NULL;
+		secureobj_rsa->finish = NULL;
+		secureobj_rsa->flags = 0;
+		secureobj_rsa->app_data = NULL;
+		secureobj_rsa->rsa_sign = NULL;
+		secureobj_rsa->rsa_verify = NULL;
+		secureobj_rsa->rsa_keygen = rsa_meth->rsa_keygen;
+	} else {
+		print_error("ENGINE_set_RSA failed\n");
+		goto end;
+	}
+#else
+	secureobj_ec = EC_KEY_METHOD_new(NULL);
+	if (secureobj_ec == NULL) {
+		print_error("EC_KEY_METHOD_new  failed\n");
+		goto end;
+	}
+
+	int (*pkeygen)(EC_KEY *key);
+	int (*compute_key)(unsigned char **pout, size_t *poutlen,
+                       const EC_POINT *pub_key, const EC_KEY *ecdh);
+	EC_KEY_METHOD_get_keygen(EC_KEY_OpenSSL(), &pkeygen);
+	EC_KEY_METHOD_get_compute_key(EC_KEY_OpenSSL(), &compute_key);
+
+	EC_KEY_METHOD_set_init(secureobj_ec, 0, 0, 0, 0, 0, 0);
+	EC_KEY_METHOD_set_keygen(secureobj_ec, pkeygen);
+	EC_KEY_METHOD_set_compute_key(secureobj_ec, compute_key);
+	EC_KEY_METHOD_set_sign(secureobj_ec, NULL,	secure_obj_ec_sign_setup, secure_obj_ec_sign);
+	EC_KEY_METHOD_set_verify(secureobj_ec, NULL, secure_obj_ec_verify);
+
+	if (!ENGINE_set_EC(engine, secureobj_ec)) {
+		print_error("ENGINE_set_ECDSA  failed\n");
+		goto end;
+	}
+
+	secureobj_rsa = RSA_meth_new("Secure Object RSA Method", 0);
+	if (secureobj_rsa == NULL) {
+		print_error("RSA_meth_new  failed\n");
+		goto end;
+	}
+
+	if (ENGINE_set_RSA(engine, secureobj_rsa)) {
+		const RSA_METHOD *rsa_meth = RSA_PKCS1_OpenSSL();
+
+		RSA_meth_set_pub_enc(secureobj_rsa, RSA_meth_get_pub_enc(rsa_meth));
+		RSA_meth_set_pub_dec(secureobj_rsa, RSA_meth_get_pub_dec(rsa_meth));
+		RSA_meth_set_priv_enc(secureobj_rsa, secure_obj_rsa_priv_enc);
+		RSA_meth_set_priv_dec(secureobj_rsa, secure_obj_rsa_priv_dec);
+		RSA_meth_set_mod_exp(secureobj_rsa, RSA_meth_get_mod_exp(rsa_meth));
+		RSA_meth_set_bn_mod_exp(secureobj_rsa, RSA_meth_get_bn_mod_exp(rsa_meth));
+		RSA_meth_set_init(secureobj_rsa, NULL);
+		RSA_meth_set_finish(secureobj_rsa, NULL);
+		RSA_meth_set_sign(secureobj_rsa, NULL);
+		RSA_meth_set_verify(secureobj_rsa, NULL);
+		RSA_meth_set_keygen(secureobj_rsa, RSA_meth_get_keygen(rsa_meth));
+	} else {
+		print_error("ENGINE_set_RSA failed\n");
+		goto end;
+	}
+#endif
+
 	if (!ENGINE_set_id(engine, engine_id) ||
 		!ENGINE_set_name(engine, engine_name)) {
 		print_error("ENGINE_set_id or ENGINE_set_name or ENGINE_set_init_function failed\n");
 		goto end;
 	}
 
-	if (ENGINE_set_RSA(engine, &secureobj_rsa)) {
-		const RSA_METHOD *rsa_meth = RSA_PKCS1_SSLeay();
-
-		memset(&secureobj_rsa, 0, sizeof(RSA_METHOD));
-		secureobj_rsa.name = "Secure Object RSA Engine";
-		secureobj_rsa.rsa_pub_enc = rsa_meth->rsa_pub_enc;
-		secureobj_rsa.rsa_pub_dec = rsa_meth->rsa_pub_dec;
-		secureobj_rsa.rsa_priv_enc = secure_obj_rsa_priv_enc;
-		secureobj_rsa.rsa_priv_dec = secure_obj_rsa_priv_dec;
-		secureobj_rsa.rsa_mod_exp = rsa_meth->rsa_mod_exp;
-		secureobj_rsa.bn_mod_exp = rsa_meth->bn_mod_exp;
-		secureobj_rsa.init = NULL;
-		secureobj_rsa.finish = NULL;
-		secureobj_rsa.flags = 0;
-		secureobj_rsa.app_data = NULL;
-		secureobj_rsa.rsa_sign = NULL;
-		secureobj_rsa.rsa_verify = NULL;
-		secureobj_rsa.rsa_keygen = rsa_meth->rsa_keygen;
-	} else {
-		print_error("ENGINE_set_RSA failed\n");
-		goto end;
-	}
-
 	if (!ENGINE_set_default_RSA(engine)) {
 		print_error("ENGINE_set_default_RSA failed\n");
-		goto end;
-	}
-
-	if (!ENGINE_set_ECDSA(engine, secureobj_ec)) {
-		print_error("ENGINE_set_ECDSA  failed\n");
 		goto end;
 	}
 
