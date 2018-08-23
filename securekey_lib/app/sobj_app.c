@@ -1273,7 +1273,7 @@ void print_usage(void)
 	printf("\t\t -h - Object Handle (In Decimal)\n");
 	printf("\t\t -n - Number of Objects (Default = 5)\n");
 	printf("\t\t -m - Mechanism Id (Supported: rsa-pair, ec-pair)\n");
-	printf("\t\t -w - Fake .pem file.(Optional command while generating key-pair only RSA supported.)\n\n");
+	printf("\t\t -w - Fake .pem file.(Optional command while generating/creating RSA, ECDSA key-pair).\n\n");
 	printf("\tUsage:\n");
 	printf("\t\tCreation:\n");
 	printf("\t\tsobj_app -C -f <private.pem> -k <key-type> -o <obj-type> -s <key-size> -l <obj-label> -i <obj-ID> [-w <file.pem>]\n");
