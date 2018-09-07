@@ -69,7 +69,8 @@ static int secure_obj_ec_sign_setup (EC_KEY *eckey, BN_CTX *ctx,
 {
 	return 1;
 }
-static ECDSA_SIG *secure_obj_ec_sign (const unsigned char *dgst, int dgst_len,
+
+static ECDSA_SIG *secure_obj_ec_sign_sig (const unsigned char *dgst, int dgst_len,
 			const BIGNUM *inv, const BIGNUM *rp,
 			EC_KEY *eckey)
 {
@@ -92,7 +93,7 @@ static ECDSA_SIG *secure_obj_ec_sign (const unsigned char *dgst, int dgst_len,
 	uint8_t *signature = NULL;
 	uint16_t signature_len = 0, signature_len_bytes = 0;;
 	ECDSA_SIG *ec_sig = NULL;
-	BIGNUM *bn_r, *bn_s;
+	BIGNUM *bn_r = NULL, *bn_s = NULL;
 	EC_KEY *dup_eckey = NULL;
 
 	/* Here we are getting the private key to find the object id
@@ -258,16 +259,20 @@ static ECDSA_SIG *secure_obj_ec_sign (const unsigned char *dgst, int dgst_len,
 		goto failure;
 	}
 
-#if OPENSSL_VERSION_NUMBER < 0x10100000L
-	bn_r = ec_sig->r;
-	bn_s = ec_sig->s;
-#else
-	ECDSA_SIG_get0(ec_sig, (const BIGNUM **)&bn_r,
-		(const BIGNUM **)&bn_s);
-#endif
-	BN_bin2bn(signature, signature_len_bytes/2, bn_r);
-	BN_bin2bn(signature + (signature_len_bytes/2),
+	bn_r = BN_bin2bn(signature, signature_len_bytes/2, bn_r);
+	bn_s = BN_bin2bn(signature + (signature_len_bytes/2),
 		signature_len_bytes/2, bn_s);
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+	ec_sig->r = bn_r;
+	ec_sig->s = bn_s;
+#else
+	if (!ECDSA_SIG_set0(ec_sig, bn_r, bn_s)) {
+		print_error("ECDSA_SIG_set0 failed\n");
+		ret = -1;
+		goto failure;
+	}
+#endif
 
 send_to_openssl:
 	if (ret == -2) {
@@ -294,7 +299,24 @@ failure:
 	return ec_sig;
 }
 
-static int secure_obj_ec_verify(const unsigned char *dgst, int dgst_len,
+static int secure_obj_ec_sign (int type, const unsigned char *dgst,
+                                        int dlen, unsigned char *sig,
+                                        unsigned int *siglen,
+                                        const BIGNUM *kinv, const BIGNUM *r,
+                                        EC_KEY *eckey)
+{
+	ECDSA_SIG *s;
+	s = secure_obj_ec_sign_sig(dgst, dlen, kinv, r, eckey);
+	if (s == NULL) {
+		*siglen = 0;
+		return 0;
+	}
+	*siglen = i2d_ECDSA_SIG(s, &sig);
+	ECDSA_SIG_free(s);
+	return 1;
+}
+
+static int secure_obj_ec_verify_sig(const unsigned char *dgst, int dgst_len,
 			const ECDSA_SIG *sig, EC_KEY *eckey)
 {
 	/* Here verification is done via openssl software implementation
@@ -323,6 +345,37 @@ static int secure_obj_ec_verify(const unsigned char *dgst, int dgst_len,
 
 done:
                 return ret;
+}
+
+static int secure_obj_ec_verify(int type, const unsigned
+                                            char *dgst, int dgst_len,
+                                            const unsigned char *sigbuf,
+                                            int sig_len, EC_KEY *eckey)
+{
+	ECDSA_SIG *s;
+	const unsigned char *p = sigbuf;
+	unsigned char *der = NULL;
+	int derlen = -1;
+	int ret = -1;
+
+	s = ECDSA_SIG_new();
+	if (s == NULL)
+		return (ret);
+	if (d2i_ECDSA_SIG(&s, &p, sig_len) == NULL)
+		goto err;
+	/* Ensure signature uses DER and doesn't have trailing garbage */
+	derlen = i2d_ECDSA_SIG(s, &der);
+	if (derlen != sig_len || memcmp(sigbuf, der, derlen))
+		goto err;
+	ret = secure_obj_ec_verify_sig(dgst, dgst_len, s, eckey);
+err:
+	if (derlen > 0) {
+		OPENSSL_cleanse(der, derlen);
+		OPENSSL_free(der);
+	}
+	ECDSA_SIG_free(s);
+	return (ret);
+
 }
 
 static int secure_obj_rsa_priv_enc(int flen, const unsigned char *from,
@@ -786,8 +839,11 @@ static int bind(ENGINE *engine, const char *id)
 	EC_KEY_METHOD_set_init(secureobj_ec, 0, 0, 0, 0, 0, 0);
 	EC_KEY_METHOD_set_keygen(secureobj_ec, pkeygen);
 	EC_KEY_METHOD_set_compute_key(secureobj_ec, compute_key);
-	EC_KEY_METHOD_set_sign(secureobj_ec, NULL,	secure_obj_ec_sign_setup, secure_obj_ec_sign);
-	EC_KEY_METHOD_set_verify(secureobj_ec, NULL, secure_obj_ec_verify);
+	EC_KEY_METHOD_set_sign(secureobj_ec, secure_obj_ec_sign,
+				secure_obj_ec_sign_setup,
+				secure_obj_ec_sign_sig);
+	EC_KEY_METHOD_set_verify(secureobj_ec, secure_obj_ec_verify,
+				secure_obj_ec_verify_sig);
 
 	if (!ENGINE_set_EC(engine, secureobj_ec)) {
 		print_error("ENGINE_set_ECDSA  failed\n");
