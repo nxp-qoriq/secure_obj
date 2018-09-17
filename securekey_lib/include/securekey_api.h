@@ -35,6 +35,10 @@ struct SK_FUNCTION_LIST {
 	SK_RET_CODE(*SK_Digest)(SK_MECHANISM_INFO *pMechanismType,
 			const uint8_t *inData, uint16_t inDataLen,
 			uint8_t *outDigest, uint16_t *outDigestLen);
+	SK_RET_CODE(*SK_GenerateKeyPair)(SK_MECHANISM_INFO *pMechanism,
+			       SK_ATTRIBUTE *attr, uint16_t attrCount,
+			       SK_OBJECT_HANDLE *phKey);
+	SK_RET_CODE(*SK_EraseObject)(SK_OBJECT_HANDLE hObject);
 };
 
 typedef struct SK_FUNCTION_LIST SK_FUNCTION_LIST;
