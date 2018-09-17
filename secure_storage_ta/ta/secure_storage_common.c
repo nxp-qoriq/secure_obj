@@ -125,7 +125,7 @@ TEE_Result TA_GetObjectAttributes(uint32_t param_types, TEE_Param params[4])
 		match_attr = TA_GetSKAttr(attrs[n].type, obj_attrs,
 					  obj_attr_cnt);
 		if (match_attr == NULL) {
-			res_attr = TEE_ERROR_BAD_PARAMETERS;
+			attrs[n].valueLen = -1;
 			continue;
 		}
 		/*
