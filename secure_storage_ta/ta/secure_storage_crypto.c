@@ -283,7 +283,8 @@ TEE_Result TA_DecryptData(uint32_t param_types, TEE_Param params[4])
 		goto out;
 	}
 
-	DMSG("Allocate Transient Object!\n");
+	DMSG("Allocate Transient Object! obj_type = %u, obj_size = %u\n",
+		objectInfo.objectType, objectInfo.objectSize);
 	res = TEE_AllocateTransientObject(objectInfo.objectType,
 					  objectInfo.objectSize, &tObject);
 	if (res != TEE_SUCCESS)
@@ -298,6 +299,21 @@ TEE_Result TA_DecryptData(uint32_t param_types, TEE_Param params[4])
 	case SKM_RSAES_PKCS1_V1_5:
 		algorithm = TEE_ALG_RSAES_PKCS1_V1_5;
 		break;
+	case SKM_RSAES_PKCS1_OAEP_MGF1_SHA1:
+		algorithm = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA1;
+		break;
+	case SKM_RSAES_PKCS1_OAEP_MGF1_SHA224:
+		algorithm = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA224;
+		break;
+	case SKM_RSAES_PKCS1_OAEP_MGF1_SHA256:
+		algorithm = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA256;
+		break;
+	case SKM_RSAES_PKCS1_OAEP_MGF1_SHA384:
+		algorithm = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA384;
+		break;
+	case SKM_RSAES_PKCS1_OAEP_MGF1_SHA512:
+		algorithm = TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA512;
+		break;
 	case SKM_RSA_PKCS_NOPAD:
 		algorithm = TEE_ALG_RSA_NOPAD;
 		break;
@@ -306,7 +322,8 @@ TEE_Result TA_DecryptData(uint32_t param_types, TEE_Param params[4])
 		goto out;
 	}
 
-	DMSG("Allocate Operation!\n");
+	DMSG("Allocate Operation! algorithm = %08x, obj_size = %u\n",
+		algorithm, objectInfo.maxObjectSize);
 	res = TEE_AllocateOperation(&operation, algorithm, TEE_MODE_DECRYPT,
 				    objectInfo.objectSize);
 	if (res != TEE_SUCCESS)
@@ -317,7 +334,8 @@ TEE_Result TA_DecryptData(uint32_t param_types, TEE_Param params[4])
 	if (res != TEE_SUCCESS)
 		goto out;
 
-	DMSG("Asymetric Decrypt Data!\n");
+	DMSG("Asymetric Decrypt Data! enc_size = %u, out_size = %u\n",
+		params[1].memref.size, params[2].memref.size);
 	res = TEE_AsymmetricDecrypt(operation, NULL, 0,
 				    params[1].memref.buffer,
 				    params[1].memref.size,
