@@ -718,12 +718,23 @@ static int secure_obj_rsa_priv_dec(int flen, const unsigned char *from,
 		goto failure;
 	}
 
-	mechType.mechanism = SKM_RSA_PKCS_NOPAD;
+	switch (padding) {
+		case RSA_PKCS1_PADDING:
+			mechType.mechanism = SKM_RSAES_PKCS1_V1_5;
+			break;
+		case RSA_PKCS1_OAEP_PADDING:
+			mechType.mechanism = SKM_RSAES_PKCS1_OAEP_MGF1_SHA1;
+			break;
+		default:
+			print_error("Unsupported padding type, only RSA_PKCS1_PADDING/RSA_PKCS1_OAEP_PADDING is supported\n");
+			ret  = -1;
+			goto failure;
+	}
 
 	out_len = rsa_key_len;
 
 	sk_ret = SK_Decrypt(&mechType, hObject, from, flen,
-			padded_to, &out_len);
+			to, &out_len);
 	if (sk_ret != SKR_OK) {
 		print_error("SK_Decrypt failed with ret code 0x%x\n", sk_ret);
 		ret = -1;
@@ -731,23 +742,6 @@ static int secure_obj_rsa_priv_dec(int flen, const unsigned char *from,
 	}
 
 	print_info("out_len = %u\n", out_len);
-
-	switch (padding) {
-		case RSA_PKCS1_PADDING:
-			ret = RSA_padding_check_PKCS1_type_2(to,
-				rsa_key_len, padded_to, out_len,
-				rsa_key_len);
-			if (ret == -1) {
-				print_error("RSA_padding_check_PKCS1_type_2 failed\n");
-				ret = -1;
-				goto failure;
-			}
-			break;
-		default:
-			print_error("Unsupported padding type, only RSA_PKCS1_PADDING is supported\n");
-			ret = -1;
-			goto failure;
-	}
 
 failure:
 	if (padded_to)

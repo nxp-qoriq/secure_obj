@@ -14,27 +14,25 @@
 #include <stdint.h>
 #include <string.h>
 
-int padding = RSA_PKCS1_PADDING;
-
-int public_encrypt(unsigned char * data, int data_len, RSA * rsa, unsigned char *encrypted)
+int public_encrypt(unsigned char * data, int data_len, RSA * rsa, unsigned char *encrypted, int padding)
 {
 	int result = RSA_public_encrypt(data_len, data, encrypted, rsa, padding);
 	return result;
 }
 
-int private_decrypt(unsigned char * enc_data, int enc_data_len, RSA *rsa, unsigned char *decrypted)
+int private_decrypt(unsigned char * enc_data, int enc_data_len, RSA *rsa, unsigned char *decrypted, int padding)
 {
 	int  result = RSA_private_decrypt(enc_data_len, enc_data, decrypted, rsa, padding);
 	return result;
 }
 
-int private_encrypt(unsigned char * data,int data_len, RSA *rsa, unsigned char *encrypted)
+int private_encrypt(unsigned char * data,int data_len, RSA *rsa, unsigned char *encrypted, int padding)
 {
 	int result = RSA_private_encrypt(data_len, data, encrypted, rsa, padding);
 	return result;
 }
 
-int public_decrypt(unsigned char * enc_data,int enc_data_len, RSA *rsa, unsigned char *decrypted)
+int public_decrypt(unsigned char * enc_data,int enc_data_len, RSA *rsa, unsigned char *decrypted, int padding)
 {
 	int  result = RSA_public_decrypt(enc_data_len, enc_data, decrypted, rsa, padding);
 	return result;
@@ -61,13 +59,25 @@ int main(int argc, char *argv[])
 	ENGINE *eng = NULL;
 	FILE *fptr = NULL;
 	RSA *rsa = NULL;
+	int padding = 0;
 
-	if (argc <= 1) {
-		printf("Please give the label of Private Key to be used\n");
+	if (argc <= 2) {
+		printf("Please give key file and padding scheme to be used\n");
 		exit(0);
 	}
 
-	printf("Device Key Label = %s\n", argv[1]);
+	printf("Key File = %s\n", argv[1]);
+	printf("Padding Scheme = %s\n", argv[2]);
+
+	if (strcmp(argv[2], "pkcs") == 0) {
+		padding = RSA_PKCS1_PADDING;
+	} else if (strcmp(argv[2], "oaep") == 0) {
+		padding = RSA_PKCS1_OAEP_PADDING;
+	} else {
+		printf("only pkcs/oaep padding supported\n");
+		ret = 1;
+		goto failure;
+	}
 
 	ENGINE_load_builtin_engines();
 
@@ -97,16 +107,6 @@ int main(int argc, char *argv[])
 		goto failure;
 	}
 
-#if 0
-	/* RSA Key object with label "dev_key" is being genreated by sobj_app */
-	priv_key = ENGINE_load_private_key(eng, argv[1], NULL, NULL);
-	if (priv_key == NULL) {
-		printf("Key with Label %s not found.\n", argv[1]);
-		ret = 1;
-		goto failure;
-	}
-#endif
-
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
 	rsa = priv_key->pkey.rsa;
 #else
@@ -135,7 +135,8 @@ int main(int argc, char *argv[])
 
 	printf("Plain Text = %s\n", plainText);
 	printf("Starting RSA Public Encrypt....\n");
-	encrypted_length = public_encrypt(plainText, plain_text_len, rsa, encrypted);
+	encrypted_length = public_encrypt(plainText, plain_text_len, rsa,
+			encrypted, padding);
 	if(encrypted_length == -1) {
 		printLastError("Public Encrypt failed ");
 		ret = 1;
@@ -144,7 +145,8 @@ int main(int argc, char *argv[])
 	printf("Encryption Complete: Length of Encrypted Data = %d\n\n", encrypted_length);
 
 	printf("Starting RSA Private Decryption....\n");
-	decrypted_length = private_decrypt(encrypted, encrypted_length, rsa, decrypted);
+	decrypted_length = private_decrypt(encrypted, encrypted_length,
+			rsa, decrypted, padding);
 	if(decrypted_length == -1) {
 		printLastError("Private Decrypt failed ");
 		ret = 1;
@@ -152,24 +154,30 @@ int main(int argc, char *argv[])
 	}
 	printf("Decryption Complete: Decrypted Text = %s\n\n", decrypted);
 
-	printf("Starting RSA Private Encryption....\n");
-	printf("Plain Text = %s\n", plainText);
-	encrypted_length = private_encrypt(plainText, plain_text_len, rsa, encrypted);
-	if(encrypted_length == -1) {
-		printLastError("Private Encrypt failed");
-		ret = 1;
-		goto failure;
-	}
-	printf("Encryption Complete: Length of Encrypted Data = %d\n\n", encrypted_length);
+	/* OpenSSL doesnot support OAEP padding scheme in Private Encrypt
+	  * Public Decrypt scenario */
+	if (padding == RSA_PKCS1_PADDING) {
+		printf("Starting RSA Private Encryption....\n");
+		printf("Plain Text = %s\n", plainText);
+		encrypted_length = private_encrypt(plainText,
+			plain_text_len, rsa, encrypted, padding);
+		if(encrypted_length == -1) {
+			printLastError("Private Encrypt failed");
+			ret = 1;
+			goto failure;
+		}
+		printf("Encryption Complete: Length of Encrypted Data = %d\n\n", encrypted_length);
 
-	printf("Starting RSA Public Decryption....\n");
-	decrypted_length = public_decrypt(encrypted, encrypted_length, rsa, decrypted);
-	if(decrypted_length == -1) {
-		printLastError("Public Decrypt failed");
-		ret = 1;
-		goto failure;
+		printf("Starting RSA Public Decryption....\n");
+		decrypted_length = public_decrypt(encrypted,
+			encrypted_length, rsa, decrypted, padding);
+		if(decrypted_length == -1) {
+			printLastError("Public Decrypt failed");
+			ret = 1;
+			goto failure;
+		}
+		printf("Decryption Complete: Decrypted Text = %s\n\n", decrypted);
 	}
-	printf("Decryption Complete: Decrypted Text = %s\n\n", decrypted);
 
 	ret = 0;
 failure:
