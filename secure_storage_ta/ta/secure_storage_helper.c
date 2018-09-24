@@ -153,8 +153,8 @@ TEE_Result unpack_sk_attrs(const uint8_t *buf, size_t blen,
 				p += (uintptr_t)buf;
 			}
 			a[n].value = (void *)p;
-			DMSG("SK Attribute - value: %p, valueLen: %08x!\n",
-				a[n].value, a[n].valueLen);
+			DMSG("SK Attribute - type: %u value: %p, valueLen: %08x!\n",
+				a[n].type, a[n].value, a[n].valueLen);
 		}
 	}
 

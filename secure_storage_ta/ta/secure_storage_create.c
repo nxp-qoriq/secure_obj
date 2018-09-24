@@ -39,12 +39,13 @@ static TEE_Result TA_GetTEEObjectTypeAndAttr(SK_ATTRIBUTE *attrs,
 #define MAX_RSA_KEYPAIR_ATTR		8
 			SK_ATTRIBUTE *attr_obj_size;
 
-			attr_obj_size = TA_GetSKAttr(SK_ATTR_MODULUS_BITS,
+			attr_obj_size = TA_GetSKAttr(SK_ATTR_MODULUS,
 						     attrs, attr_count);
 			if (attr_obj_size == NULL)
 				return TEE_ERROR_BAD_PARAMETERS;
 
-			*obj_size = *(uint32_t *)attr_obj_size->value;
+			*obj_size = (attr_obj_size->valueLen) * 8;
+
 			*obj_type = TEE_TYPE_RSA_KEYPAIR;
 			*tee_attrs = TEE_Malloc(MAX_RSA_KEYPAIR_ATTR *
 						sizeof(TEE_Attribute), 0);
@@ -97,12 +98,12 @@ static TEE_Result TA_GetTEEObjectTypeAndAttr(SK_ATTRIBUTE *attrs,
 #define MAX_RSA_PUBLIC_KEY_ATTR		2
 			SK_ATTRIBUTE *attr_obj_size;
 
-			attr_obj_size = TA_GetSKAttr(SK_ATTR_MODULUS_BITS,
+			attr_obj_size = TA_GetSKAttr(SK_ATTR_MODULUS,
 						     attrs, attr_count);
 			if (attr_obj_size == NULL)
 				return TEE_ERROR_BAD_PARAMETERS;
 
-			*obj_size = *(uint32_t *)attr_obj_size->value;
+			*obj_size = (attr_obj_size->valueLen) * 8;
 			*obj_type = TEE_TYPE_RSA_PUBLIC_KEY;
 			*tee_attrs = TEE_Malloc(MAX_RSA_PUBLIC_KEY_ATTR *
 						sizeof(TEE_Attribute), 0);
