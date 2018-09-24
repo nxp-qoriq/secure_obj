@@ -913,6 +913,7 @@ SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
 	global_function_list.SK_Digest = SK_Digest;
 	global_function_list.SK_GenerateKeyPair = SK_GenerateKeyPair;
 	global_function_list.SK_EraseObject = SK_EraseObject;
+	global_function_list.SK_CreateObject = SK_CreateObject;
 
 	*ppFuncList = &global_function_list;
 

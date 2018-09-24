@@ -39,6 +39,8 @@ struct SK_FUNCTION_LIST {
 			       SK_ATTRIBUTE *attr, uint16_t attrCount,
 			       SK_OBJECT_HANDLE *phKey);
 	SK_RET_CODE(*SK_EraseObject)(SK_OBJECT_HANDLE hObject);
+	SK_RET_CODE(* SK_CreateObject)(SK_ATTRIBUTE *attr,
+		uint16_t attrCount, SK_OBJECT_HANDLE *phObject);
 };
 
 typedef struct SK_FUNCTION_LIST SK_FUNCTION_LIST;
