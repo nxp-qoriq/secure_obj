@@ -30,8 +30,8 @@ typedef struct {
 #define PERFORM 1
 #define PARSE 2
 
-#define MAX_RSA_ATTRIBUTES 13
-#define MAX_EC_ATTRIBUTES 7
+#define MAX_RSA_ATTRIBUTES 14
+#define MAX_EC_ATTRIBUTES 8
 #define MAX_FIND_OBJ_SIZE 5
 #define U32_INVALID 0xFFFFFFFE
 #define U32_UNINTZD 0xFFFFFFFF

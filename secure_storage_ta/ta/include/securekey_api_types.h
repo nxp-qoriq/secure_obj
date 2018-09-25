@@ -85,6 +85,7 @@ typedef SK_TYPE SK_ATTRIBUTE_TYPE;
 #define SK_ATTR_OBJECT_LABEL		2 /* The object label (Mandatory in Create) */
 #define SK_ATTR_OBJECT_VALUE		3 /*  Value of Object */
 #define SK_ATTR_KEY_TYPE		5 /* Key Type RSA/EC (Mandatory with key type objects) */
+#define SK_ATTR_PRIVATE			6 /* Object is private/public (PKCS Requirement)*/
 
 /* Attributes For RSA Key Pair */
 #define SK_ATTR_MODULUS_BITS		30 /* Length in bits of modulus n */

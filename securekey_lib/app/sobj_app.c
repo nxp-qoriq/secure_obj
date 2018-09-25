@@ -268,80 +268,105 @@ cleanup:
 	return ret;
 }
 
-static void populate_attrs(SK_ATTRIBUTE *attrs, void *key, struct getOptValue *getOptVal)
+static void populate_attrs(SK_ATTRIBUTE *attrs, void *key,
+		struct getOptValue *getOptVal)
 {
 	rsa_3form_key_t *rsa_3form_key;
-	ec_key_t *ec_key;
+	ec_key_t *ec_key = NULL;
+	uint32_t sk_false = 0;
+	uint32_t attr_count = 0;
 
-	attrs[0].type = SK_ATTR_OBJECT_TYPE;
-	attrs[0].value = &(getOptVal->obj_type);
-	attrs[0].valueLen = sizeof(SK_OBJECT_TYPE);
+	attrs[attr_count].type = SK_ATTR_OBJECT_TYPE;
+	attrs[attr_count].value = &(getOptVal->obj_type);
+	attrs[attr_count].valueLen = sizeof(SK_OBJECT_TYPE);
+	attr_count++;
 
-	attrs[1].type = SK_ATTR_OBJECT_INDEX;
-	attrs[1].value = &(getOptVal->obj_id);
-	attrs[1].valueLen = sizeof(uint32_t);
+	attrs[attr_count].type = SK_ATTR_OBJECT_INDEX;
+	attrs[attr_count].value = &(getOptVal->obj_id);
+	attrs[attr_count].valueLen = sizeof(uint32_t);
+	attr_count++;
 
-	attrs[2].type = SK_ATTR_KEY_TYPE;
-	attrs[2].value = &(getOptVal->key_type);
-	attrs[2].valueLen = sizeof(SK_KEY_TYPE);
+	attrs[attr_count].type = SK_ATTR_KEY_TYPE;
+	attrs[attr_count].value = &(getOptVal->key_type);
+	attrs[attr_count].valueLen = sizeof(SK_KEY_TYPE);
+	attr_count++;
 
-	attrs[3].type = SK_ATTR_OBJECT_LABEL;
-	attrs[3].value = getOptVal->label;
-	attrs[3].valueLen = strlen(getOptVal->label);
+	attrs[attr_count].type = SK_ATTR_OBJECT_LABEL;
+	attrs[attr_count].value = getOptVal->label;
+	attrs[attr_count].valueLen = strlen(getOptVal->label);
+	attr_count++;
+
+	attrs[attr_count].type = SK_ATTR_PRIVATE;
+	attrs[attr_count].value = &sk_false;
+	attrs[attr_count].valueLen = sizeof(uint32_t);
+	attr_count++;
+
 
 	switch (getOptVal->key_type) {
 		case SKK_RSA:
 			rsa_3form_key = (rsa_3form_key_t *) key;
 
-			attrs[4].type = SK_ATTR_MODULUS_BITS;
-			attrs[4].value = &(getOptVal->key_len);
-			attrs[4].valueLen = sizeof(uint32_t);
+			attrs[attr_count].type = SK_ATTR_MODULUS_BITS;
+			attrs[attr_count].value = &(getOptVal->key_len);
+			attrs[attr_count].valueLen = sizeof(uint32_t);
+			attr_count++;
 
-			attrs[5].type = SK_ATTR_MODULUS;
-			attrs[5].value = (void *)(rsa_3form_key->rsa_modulus);
-			attrs[5].valueLen = ((getOptVal->key_len + 7) >> 3);
+			attrs[attr_count].type = SK_ATTR_MODULUS;
+			attrs[attr_count].value = (void *)(rsa_3form_key->rsa_modulus);
+			attrs[attr_count].valueLen = ((getOptVal->key_len + 7) >> 3);
+			attr_count++;
 
-			attrs[6].type = SK_ATTR_PUBLIC_EXPONENT;
-			attrs[6].value = (void *)(rsa_3form_key->rsa_pub_exp);
-			attrs[6].valueLen = 3;
+			attrs[attr_count].type = SK_ATTR_PUBLIC_EXPONENT;
+			attrs[attr_count].value = (void *)(rsa_3form_key->rsa_pub_exp);
+			attrs[attr_count].valueLen = 3;
+			attr_count++;
 
-			attrs[7].type = SK_ATTR_PRIVATE_EXPONENT;
-			attrs[7].value = (void *)(rsa_3form_key->rsa_priv_exp);
-			attrs[7].valueLen = ((getOptVal->key_len + 7) >> 3);
+			attrs[attr_count].type = SK_ATTR_PRIVATE_EXPONENT;
+			attrs[attr_count].value = (void *)(rsa_3form_key->rsa_priv_exp);
+			attrs[attr_count].valueLen = ((getOptVal->key_len + 7) >> 3);
+			attr_count++;
 
-			attrs[8].type = SK_ATTR_PRIME_1;
-			attrs[8].value = (void *)(rsa_3form_key->rsa_prime1);
-			attrs[8].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attrs[attr_count].type = SK_ATTR_PRIME_1;
+			attrs[attr_count].value = (void *)(rsa_3form_key->rsa_prime1);
+			attrs[attr_count].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attr_count++;
 
-			attrs[9].type = SK_ATTR_PRIME_2;
-			attrs[9].value = (void *)(rsa_3form_key->rsa_prime2);
-			attrs[9].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attrs[attr_count].type = SK_ATTR_PRIME_2;
+			attrs[attr_count].value = (void *)(rsa_3form_key->rsa_prime2);
+			attrs[attr_count].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attr_count++;
 
-			attrs[10].type = SK_ATTR_EXPONENT_1;
-			attrs[10].value = (void *)(rsa_3form_key->rsa_exp1);
-			attrs[10].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attrs[attr_count].type = SK_ATTR_EXPONENT_1;
+			attrs[attr_count].value = (void *)(rsa_3form_key->rsa_exp1);
+			attrs[attr_count].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attr_count++;
 
-			attrs[11].type = SK_ATTR_EXPONENT_2;
-			attrs[11].value = (void *)(rsa_3form_key->rsa_exp2);
-			attrs[11].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attrs[attr_count].type = SK_ATTR_EXPONENT_2;
+			attrs[attr_count].value = (void *)(rsa_3form_key->rsa_exp2);
+			attrs[attr_count].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attr_count++;
 
-			attrs[12].type = SK_ATTR_COEFFICIENT;
-			attrs[12].value = (void *)(rsa_3form_key->rsa_coeff);
-			attrs[12].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attrs[attr_count].type = SK_ATTR_COEFFICIENT;
+			attrs[attr_count].value = (void *)(rsa_3form_key->rsa_coeff);
+			attrs[attr_count].valueLen = ((getOptVal->key_len + 7) >> 3)/2;
+			attr_count++;
 			break;
 		case SKK_EC:
 			ec_key = (ec_key_t *)key;;
-			attrs[4].type = SK_ATTR_PARAMS;
-			attrs[4].value = ec_key->params;
-			attrs[4].valueLen = ec_key->params_len;
+			attrs[attr_count].type = SK_ATTR_PARAMS;
+			attrs[attr_count].value = ec_key->params;
+			attrs[attr_count].valueLen = ec_key->params_len;
+			attr_count++;
 
-			attrs[5].type = SK_ATTR_POINT;
-			attrs[5].value = ec_key->public_point;
-			attrs[5].valueLen = ec_key->public_point_len;
+			attrs[attr_count].type = SK_ATTR_POINT;
+			attrs[attr_count].value = ec_key->public_point;
+			attrs[attr_count].valueLen = ec_key->public_point_len;
+			attr_count++;
 
-			attrs[6].type = SK_ATTR_PRIV_VALUE;
-			attrs[6].value = ec_key->priv_value;
-			attrs[6].valueLen = ec_key->priv_value_len;
+			attrs[attr_count].type = SK_ATTR_PRIV_VALUE;
+			attrs[attr_count].value = ec_key->priv_value;
+			attrs[attr_count].valueLen = ec_key->priv_value_len;
+			attr_count++;
 
 			break;
 		default:
@@ -860,7 +885,7 @@ cleanup:
 
 static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 {
-#define	MAX_SK_ATTRS	4
+#define	MAX_SK_ATTRS	5
 	int ret = APP_OK, i = 0, der_enc_size = 0;
 	SK_RET_CODE sk_ret;
 	SK_ATTRIBUTE attrs[MAX_SK_ATTRS];
@@ -872,6 +897,7 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 	char *key_data = NULL, *curve_der_encoding = NULL;
 	uint32_t obj_id;
 	SK_KEY_TYPE key_type;
+	uint32_t sk_false = 0;
 
 	mechanismType.mechanism = getOptVal->mech_type;
 
@@ -883,6 +909,11 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 	attrs[attrCount].type = SK_ATTR_OBJECT_LABEL;
 	attrs[attrCount].value = getOptVal->label;
 	attrs[attrCount].valueLen = strlen(getOptVal->label);
+	attrCount++;
+
+	attrs[attrCount].type = SK_ATTR_PRIVATE;
+	attrs[attrCount].value = &sk_false;
+	attrs[attrCount].valueLen = sizeof(uint32_t);
 	attrCount++;
 
 	switch (mechanismType.mechanism) {
@@ -1080,7 +1111,7 @@ end:
 		free(key_data);
 	if (fptr)
 		fclose(fptr);
-
+	printf("Exiting GenerateKeyPair \n");
 	return ret;
 }
 

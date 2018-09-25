@@ -9,7 +9,7 @@
 #include "string.h"
 #include "secure_storage_common.h"
 
-#define MAX_KEY_PAIR_ATTRS		10
+#define MAX_KEY_PAIR_ATTRS		11
 #define MAX_KEY_SIZE_BYTES		512
 
 static uint8_t modulus[MAX_KEY_SIZE_BYTES];
@@ -125,6 +125,16 @@ static TEE_Result TA_GenerateECKeyPair(TEE_ObjectHandle *tObject,
 		(*attr_count)++;
 	}
 
+	/* Check if PRIVATEis passed in input attrs */
+	get_attr = TA_GetSKAttr(SK_ATTR_PRIVATE, in_attrs,
+				in_attr_cnt);
+	if (get_attr) {
+		attrs[*attr_count].type = get_attr->type;
+		attrs[*attr_count].value = get_attr->value;
+		attrs[*attr_count].valueLen = get_attr->valueLen;
+		(*attr_count)++;
+	}
+
 out:
 	if (in_attrs)
 		TEE_Free(in_attrs);
@@ -222,6 +232,16 @@ static TEE_Result TA_GenerateRSAKeyPair(TEE_ObjectHandle *tObject,
 
 	/* Check if RSA key object label is passed in input attrs */
 	get_attr = TA_GetSKAttr(SK_ATTR_OBJECT_LABEL, in_attrs,
+				in_attr_cnt);
+	if (get_attr) {
+		attrs[*attr_count].type = get_attr->type;
+		attrs[*attr_count].value = get_attr->value;
+		attrs[*attr_count].valueLen = get_attr->valueLen;
+		(*attr_count)++;
+	}
+
+	/* Check if PRIVATE is passed in input attrs */
+	get_attr = TA_GetSKAttr(SK_ATTR_PRIVATE, in_attrs,
 				in_attr_cnt);
 	if (get_attr) {
 		attrs[*attr_count].type = get_attr->type;
