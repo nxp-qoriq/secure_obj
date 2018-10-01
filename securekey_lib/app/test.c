@@ -292,17 +292,80 @@ static void do_Digest(void)
 		printf("SK_Digest2 failed with code = 0x%x\n", ret);
 
 	printf("SK_Digest successful\n");
-	printf("Digest:\n 0x");
+	printf("\n");
+	printf("\n");
+	printf("Digest[%d]:\n 0x", digestLen);
+	printf("\n");
+	printf("\n");
 	for (n = 0; n < digestLen; n++)
 		printf("%x", *(digest + n));
+	printf("\n");
+	printf("\n");
 	printf("\n");
 
 	free(digest);
 }
 
+static void do_Digest_Init_Update_Final(void)
+{
+	int ret, n = 0;
+	SK_MECHANISM_INFO mechanismType = {0};
+	SK_CONTEXT_INFO sk_ctx = {0};
+	char message[] = "Hello PKCS api";
+	char msg_update[] = "Hello PKCS api update";
+	uint8_t *digest = NULL;
+	uint16_t digestLen = 0;
+
+	mechanismType.mechanism = SKM_SHA256;
+	ret = SK_DigestInit(&mechanismType, &sk_ctx);
+
+	if (ret != SKR_OK) {
+		printf("SK_DigestInit failed with code = 0x%x\n", ret);
+		goto end;
+	}
+	for (n = 0; n < 100; n++) {
+		printf("Calling SK_DigestUpdate...\n");
+		ret = SK_DigestUpdate(&sk_ctx, message, sizeof(message));
+		if (ret != SKR_OK)
+			printf("SK_DigestUpdate failed with code = 0x%x\n", ret);
+
+		printf("Calling SK_DigestUpdate...second time\n");
+		ret = SK_DigestUpdate(&sk_ctx, msg_update, sizeof(msg_update));
+		if (ret != SKR_OK)
+			printf("SK_DigestUpdate failed with code = 0x%x\n", ret);
+	}
+	printf("Calling SK_DigestFinal...\n");
+	ret = SK_DigestFinal(&sk_ctx, digest, &digestLen);
+	if (ret != SKR_OK) {
+		printf("SK_DigestFinal failed with code = 0x%x\n", ret);
+		goto end;
+	}
+
+	digest = (uint8_t *)malloc(digestLen);
+
+	printf("Calling SK_DigestFinal...Again\n");
+	ret = SK_DigestFinal(&sk_ctx, digest, &digestLen);
+	if (ret != SKR_OK) {
+		printf("SK_Digest2 failed with code = 0x%x\n", ret);
+		goto end;
+	}
+
+	printf("SK_Digest Init Update Final is successful.\n");
+	printf("Digest[%d]:\n 0x", digestLen);
+	for (n = 0; n < digestLen; n++)
+		printf("%x", *(digest + n));
+	printf("\n");
+end:
+	if (digest)
+		free(digest);
+}
+
 int main(int argc, char *argv[])
 {
-	do_Sign(atoi(argv[1]), atoi(argv[2]));
+	printf("Starting do_Digest...\n");
+	do_Digest();
+	printf("Running test app...\n");
+	do_Digest_Init_Update_Final();
 #if 0
 	SK_OBJECT_HANDLE obj1, obj2;
 

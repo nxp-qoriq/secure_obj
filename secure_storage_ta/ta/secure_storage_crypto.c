@@ -92,6 +92,158 @@ out:
 	return res;
 }
 
+
+/*
+ * Input params:
+ * param#0 : SK Digest Update mechanism
+ * param#1 : the input data buffer
+ * param#2 : not used
+ * param#3 : not used
+ */
+TEE_Result TA_DigestUpdateData(TEE_OperationHandle *operation, uint32_t param_types, TEE_Param params[4])
+{
+	TEE_Result res = TEE_SUCCESS;
+	uint32_t algorithm;
+	uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+						   TEE_PARAM_TYPE_MEMREF_INPUT,
+						   TEE_PARAM_TYPE_NONE,
+						   TEE_PARAM_TYPE_NONE);
+
+	if (param_types != exp_param_types) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		EMSG("TA_DigestUpdateData: TEE_ERROR_BAD_PARAMETERS.\n");
+		goto out;
+	}
+
+	switch (params[0].value.a) {
+	case SKM_MD5:
+		algorithm = TEE_ALG_MD5;
+		break;
+	case SKM_SHA1:
+		algorithm = TEE_ALG_SHA1;
+		break;
+	case SKM_SHA224:
+		algorithm = TEE_ALG_SHA224;
+		break;
+	case SKM_SHA256:
+		algorithm = TEE_ALG_SHA256;
+		break;
+	case SKM_SHA384:
+		algorithm = TEE_ALG_SHA384;
+		break;
+	case SKM_SHA512:
+		algorithm = TEE_ALG_SHA512;
+		break;
+	default:
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto out;
+	}
+
+	if (*operation == TEE_HANDLE_NULL) {
+		res = TEE_AllocateOperation(operation, algorithm, TEE_MODE_DIGEST, 0);
+		if (res != TEE_SUCCESS)
+			goto out;
+		DMSG("New Operation Handle is allocated.\n");
+	}
+
+	DMSG("Generating Digest Update for input data!\n");
+	TEE_DigestUpdate(*operation, params[1].memref.buffer,
+				params[1].memref.size);
+
+	DMSG("Digest Update Successful!\n");
+out:
+	return res;
+}
+
+/*
+ * Input params:
+ * param#0 : SK Digest mechanism
+ * param#1 : the input data buffer
+ * param#2 : the output digest buffer
+ * param#3 : not used
+ */
+TEE_Result TA_DigestFinalData(TEE_OperationHandle *operation, uint32_t param_types, TEE_Param params[4])
+{
+	TEE_Result res = TEE_SUCCESS;
+	uint32_t algorithm, digest_size = 0;
+	uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
+						   TEE_PARAM_TYPE_MEMREF_INPUT,
+						   TEE_PARAM_TYPE_MEMREF_OUTPUT,
+						   TEE_PARAM_TYPE_NONE);
+
+	if (param_types != exp_param_types) {
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto out;
+	}
+
+	switch (params[0].value.a) {
+	case SKM_MD5:
+		algorithm = TEE_ALG_MD5;
+		digest_size = TEE_MD5_HASH_SIZE;
+		break;
+	case SKM_SHA1:
+		algorithm = TEE_ALG_SHA1;
+		digest_size = TEE_SHA1_HASH_SIZE;
+		break;
+	case SKM_SHA224:
+		algorithm = TEE_ALG_SHA224;
+		digest_size = TEE_SHA224_HASH_SIZE;
+		break;
+	case SKM_SHA256:
+		algorithm = TEE_ALG_SHA256;
+		digest_size = TEE_SHA256_HASH_SIZE;
+		break;
+	case SKM_SHA384:
+		algorithm = TEE_ALG_SHA384;
+		digest_size = TEE_SHA384_HASH_SIZE;
+		break;
+	case SKM_SHA512:
+		algorithm = TEE_ALG_SHA512;
+		digest_size = TEE_SHA512_HASH_SIZE;
+		break;
+	default:
+		res = TEE_ERROR_BAD_PARAMETERS;
+		goto out;
+	}
+
+	if (*operation == TEE_HANDLE_NULL) {
+		res = TEE_AllocateOperation(operation, algorithm, TEE_MODE_DIGEST, 0);
+		if (res != TEE_SUCCESS)
+			goto out;
+		DMSG("New Operation Handle is Allocated.\n");
+	}
+
+	/* Check for output digest buffer */
+	if (params[2].memref.buffer == NULL) {
+		params[2].memref.size = digest_size;
+		DMSG("Recieved with digest buffer as null.");
+		res = TEE_SUCCESS;
+		goto out1;
+	} else if (params[2].memref.size < digest_size) {
+		res = TEE_ERROR_SHORT_BUFFER;
+		goto out;
+	}
+
+	DMSG("Generate digest for input data!\n");
+	res = TEE_DigestDoFinal(*operation, params[1].memref.buffer,
+				params[1].memref.size, params[2].memref.buffer,
+				&params[2].memref.size);
+
+	if (res != TEE_SUCCESS)
+		goto out;
+
+	DMSG("Digest Successful!\n");
+out:
+	if (*operation) {
+		TEE_FreeOperation(*operation);
+		*operation = TEE_HANDLE_NULL;
+		DMSG("Freeing-up the TEE Operation Context.\n");
+	}
+
+out1:
+	return res;
+}
+
 int get_ec_algorithm(size_t obj_size)
 {
 	switch (obj_size) {

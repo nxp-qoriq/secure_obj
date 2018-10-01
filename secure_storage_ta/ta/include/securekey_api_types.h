@@ -47,6 +47,7 @@ typedef uint16_t SK_RET_CODE;
 #define SKR_ERR_SECURITY		(0x6019) /* A security fault was detected.*/
 #define SKR_ERR_OBJECT_HANDLE_INVALID	(0x6020) /* Object Handle Invalid */
 
+
 /*
  * A type for all the defines.
  */
@@ -179,5 +180,16 @@ typedef struct SK_MECHANISM_INFO {
 	/* The length in bytes of parameter */
 	uint16_t		ulParameterLen;
 } SK_MECHANISM_INFO;
+
+/*
+ * Stores all the information required to continue SignUpdate, DigestUpdate etc.
+ */
+typedef struct SK_CONTEXT_INFO_T {
+	SK_CONTEXT_HANDLE	*tee_ctx_handle;/* TEE Context Handle */
+	SK_CONTEXT_HANDLE	*tee_sess_handle;/* TEE Session Handle */
+	SK_MECHANISM_INFO	mech;
+	uint16_t		chunkLen;	/* Last Buffer length. */
+	void			*chunk;		/* Last Buffer (Not part of Digest)*/
+} SK_CONTEXT_INFO;
 
 #endif /* _SECUREKEY_API_TYPES_H_ */

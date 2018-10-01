@@ -16,9 +16,9 @@ EXPORT_DIR ?= $(O)/export
 OUT_DIR ?= $(O)/securekey_lib
 
 .PHONY: all securekey_lib install \
-	clean distclean sobj_app mp_app mp_verify
+	clean distclean sobj_app mp_app mp_verify app
 
-all: securekey_lib securekey_static_lib install sobj_app mp_app mp_verify
+all: securekey_lib securekey_static_lib install sobj_app mp_app mp_verify app
 
 LIB_NAME	:= libsecure_obj.so
 STATIC_LIB_NAME        := libsecure_obj.a

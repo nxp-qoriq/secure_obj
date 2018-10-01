@@ -8,6 +8,10 @@
 
 #include "securekey_api_types.h"
 
+typedef struct session_ctx_t {
+	TEE_OperationHandle operation;
+} session_ctx;
+
 /* Database API's declaration */
 TEE_Result TA_OpenDatabase(void);
 TEE_Result TA_GetNextObjectID(uint32_t *next_obj_id);
@@ -30,6 +34,12 @@ TEE_Result TA_GetObjectAttributes(uint32_t param_types, TEE_Param params[4]);
 
 /* Generate Digest API */
 TEE_Result TA_DigestData(uint32_t param_types, TEE_Param params[4]);
+
+/* Digest Update API */
+TEE_Result TA_DigestUpdateData(TEE_OperationHandle *operation, uint32_t param_types, TEE_Param params[4]);
+
+/* Digest Final API */
+TEE_Result TA_DigestFinalData(TEE_OperationHandle *operation, uint32_t param_types, TEE_Param params[4]);
 
 /* Sign Digest API */
 TEE_Result TA_SignDigest(uint32_t param_types, TEE_Param params[4]);

@@ -42,6 +42,9 @@ void TA_DestroyEntryPoint(void)
 TEE_Result TA_OpenSessionEntryPoint(uint32_t param_types,
 		TEE_Param  params[4], void **sess_ctx)
 {
+#ifndef SK_INVALID_HANDLE
+	session_ctx * sess_ctx_info;
+#endif
 	uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_NONE,
 						   TEE_PARAM_TYPE_NONE,
 						   TEE_PARAM_TYPE_NONE,
@@ -51,8 +54,18 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t param_types,
 
 	/* Unused parameters */
 	(void)&params;
-	(void)&sess_ctx;
 
+#ifdef SK_INVALID_HANDLE
+	(void)&sess_ctx;
+#else
+	sess_ctx_info = TEE_Malloc(sizeof(session_ctx), 0);
+	if (!sess_ctx_info) {
+		EMSG("Session Context memory allocation failed.");
+		return TEE_ERROR_OUT_OF_MEMORY;
+	}
+	sess_ctx_info->operation = TEE_HANDLE_NULL;
+	*sess_ctx = sess_ctx_info;
+#endif
 	return TEE_SUCCESS;
 }
 
@@ -62,7 +75,14 @@ TEE_Result TA_OpenSessionEntryPoint(uint32_t param_types,
  */
 void TA_CloseSessionEntryPoint(void *sess_ctx)
 {
-	(void)&sess_ctx; /* Unused parameter */
+#ifdef SK_INVALID_HANDLE
+	(void)&sess_ctx;	/* Unused parameter */
+#else
+	if (sess_ctx) {
+		TEE_Free(sess_ctx);
+		sess_ctx = TEE_HANDLE_NULL;
+	}
+#endif
 	DMSG("Goodbye!\n");
 }
 
@@ -74,7 +94,18 @@ void TA_CloseSessionEntryPoint(void *sess_ctx)
 TEE_Result TA_InvokeCommandEntryPoint(void *sess_ctx, uint32_t cmd_id,
 			uint32_t param_types, TEE_Param params[4])
 {
-	(void)&sess_ctx; /* Unused parameter */
+#ifdef SK_INVALID_HANDLE
+	(void)&sess_ctx;
+#else
+	session_ctx *sess_ctx_info;
+
+	if (sess_ctx)
+		sess_ctx_info = (session_ctx *)sess_ctx;
+	else {
+		EMSG("Session Context is un-initialized.");
+		return TEE_ERROR_BAD_PARAMETERS;
+	}
+#endif
 
 	switch (cmd_id) {
 	case TEE_CREATE_OBJECT:
@@ -91,6 +122,18 @@ TEE_Result TA_InvokeCommandEntryPoint(void *sess_ctx, uint32_t cmd_id,
 		return TA_DecryptData(param_types, params);
 	case TEE_DIGEST_DATA:
 		return TA_DigestData(param_types, params);
+	case TEE_DIGEST_UPDATE_DATA:
+#ifdef SK_INVALID_HANDLE
+		return TA_DigestUpdateData(param_types, params);
+#else
+		return TA_DigestUpdateData(&sess_ctx_info->operation, param_types, params);
+#endif
+	case TEE_DIGEST_FINAL_DATA:
+#ifdef SK_INVALID_HANDLE
+		return TA_DigestFinalData(param_types, params);
+#else
+		return TA_DigestFinalData(&sess_ctx_info->operation, param_types, params);
+#endif
 	case TEE_GENERATE_KEYPAIR:
 		return TA_GenerateKeyPair(param_types, params);
 	default:

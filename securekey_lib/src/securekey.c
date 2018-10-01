@@ -899,6 +899,250 @@ end:
 	return ret;
 }
 
+SK_RET_CODE SK_DigestInit(SK_MECHANISM_INFO *pMechanismType, SK_CONTEXT_INFO *sk_ctx)
+{
+	TEEC_Result res;
+	TEEC_Context *ctx;
+	TEEC_Session *sess;
+	TEEC_UUID uuid = TA_SECURE_STORAGE_UUID;
+	uint32_t err_origin;
+	SK_RET_CODE ret = SKR_OK;
+
+	if ((pMechanismType == NULL) || (sk_ctx == NULL)) {
+		ret = SKR_ERR_BAD_PARAMETERS;
+		goto end;
+	}
+
+	ctx = malloc(sizeof(TEEC_Context));
+	if (!ctx) {
+		print_error("Malloc Failed: Insufficient Memory.\n");
+		ret = SKR_ERR_OUT_OF_MEMORY;
+		goto end;
+	}
+	memset(ctx, 0, sizeof(TEEC_Context));
+	/* Initialize a context connecting us to the TEE */
+	res = TEEC_InitializeContext(NULL, ctx);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_InitializeContext failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto end;
+	}
+
+	sess = malloc(sizeof(TEEC_Session));
+	if (!sess) {
+		print_error("Malloc Failed: Insufficient Memory.\n");
+		ret = SKR_ERR_OUT_OF_MEMORY;
+		goto end;
+	}
+	memset(sess, 0, sizeof(TEEC_Session));
+	res = TEEC_OpenSession(ctx, sess, &uuid,
+			TEEC_LOGIN_PUBLIC, NULL, NULL, &err_origin);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_Opensession failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		TEEC_FinalizeContext(ctx);
+		goto end;
+	}
+
+	sk_ctx->tee_ctx_handle = ctx;
+	sk_ctx->tee_sess_handle = sess;
+	sk_ctx->chunk = NULL;
+	sk_ctx->chunkLen = 0;
+	memcpy(&sk_ctx->mech, pMechanismType, sizeof(SK_MECHANISM_INFO));
+
+	print_info("SK_DigestInit:\n");
+	print_info("sk_ctx->tee_ctx_handle = 0x%p\n", (SK_CONTEXT_HANDLE *)sk_ctx->tee_ctx_handle);
+	print_info("sk_ctx->tee_sess_handle = 0x%p\n", (SK_CONTEXT_HANDLE *) sk_ctx->tee_sess_handle);
+	print_info("sk_ctx->mech.mechanism = %x\n", sk_ctx->mech.mechanism);
+	print_info("sk_ctx->tee_chunk = 0x%p\n", sk_ctx->chunk);
+	print_info("sk_ctx->tee_chunk_len = 0x%x\n", sk_ctx->chunkLen);
+end:
+	return ret;
+}
+
+SK_RET_CODE SK_DigestUpdate(SK_CONTEXT_INFO *sk_ctx,
+				const uint8_t *inPart, uint16_t inPartLen)
+{
+	TEEC_Result res;
+	TEEC_Context *ctx;
+	TEEC_Session *sess;
+	TEEC_Operation op;
+	TEEC_SharedMemory shm_in;
+	uint32_t err_origin;
+	SK_RET_CODE ret = SKR_OK;
+
+	/* Mechanism should be checked before proceeding. */
+	if ((sk_ctx == NULL) || (sk_ctx->mech.mechanism == 0)
+		|| (inPart == NULL) || (inPartLen == 0)) {
+		ret = SKR_ERR_BAD_PARAMETERS;
+		goto end;
+	}
+
+	if (sk_ctx->chunk == NULL && sk_ctx->chunkLen == 0) {
+		sk_ctx->chunk = malloc(inPartLen);
+		if (!sk_ctx->chunk) {
+			print_error("Malloc Failed: Insufficient Memory.\n");
+			ret = SKR_ERR_OUT_OF_MEMORY;
+			goto end;
+		}
+		sk_ctx->chunkLen = inPartLen;
+		memcpy(sk_ctx->chunk, inPart, inPartLen);
+
+		goto end;
+	}
+
+	ctx = (TEEC_Context *) sk_ctx->tee_ctx_handle;
+	sess = (TEEC_Session *) sk_ctx->tee_sess_handle;
+
+	shm_in.size = sk_ctx->chunkLen;
+	shm_in.flags = TEEC_MEM_INPUT;
+
+	res = TEEC_AllocateSharedMemory(ctx, &shm_in);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto end;
+	}
+
+	memcpy(shm_in.buffer, sk_ctx->chunk, shm_in.size);
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_MEMREF_WHOLE,
+					 TEEC_NONE, TEEC_NONE);
+	op.params[0].value.a = sk_ctx->mech.mechanism;
+	op.params[1].memref.parent = &shm_in;
+	op.params[1].memref.offset = 0;
+	op.params[1].memref.size = shm_in.size;
+
+	print_info("Invoking TEE_DIGEST_DATA\n");
+	res = TEEC_InvokeCommand(sess, TEE_DIGEST_UPDATE_DATA, &op,
+				 &err_origin);
+
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_InvokeCommand failed with code 0x%x", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail;
+	}
+	print_info("TEE_DIGEST_UPDATE_DATA successful\n");
+
+	if (sk_ctx->chunkLen != inPartLen) {
+		free(sk_ctx->chunk);
+		sk_ctx->chunk = malloc(inPartLen);
+		if (sk_ctx->chunk) {
+			sk_ctx->chunkLen = inPartLen;
+		} else {
+			print_error("Malloc Failed: Insufficient Memory.\n");
+			ret = SKR_ERR_OUT_OF_MEMORY;
+			goto fail;
+		}
+	}
+	memcpy(sk_ctx->chunk, inPart, inPartLen);
+	TEEC_ReleaseSharedMemory(&shm_in);
+	goto end;
+
+fail:
+	TEEC_ReleaseSharedMemory(&shm_in);
+	TEEC_CloseSession(sess);
+	TEEC_FinalizeContext(ctx);
+	if (sess)
+		free(sess);
+	if (ctx)
+		free(ctx);
+end:
+	return ret;
+}
+
+SK_RET_CODE SK_DigestFinal(SK_CONTEXT_INFO *sk_ctx,
+		      uint8_t *outDigest, uint16_t *outDigestLen)
+{
+	TEEC_Result res;
+	TEEC_Context *ctx;
+	TEEC_Session *sess;
+	TEEC_Operation op;
+	TEEC_SharedMemory shm_in, shm_out;
+	uint32_t err_origin;
+	SK_RET_CODE ret = SKR_OK;
+
+	if ((sk_ctx == NULL) || (sk_ctx->mech.mechanism == 0) ||
+	    ((outDigest == NULL) && (*outDigestLen != 0))) {
+		ret = SKR_ERR_BAD_PARAMETERS;
+		goto end;
+	}
+
+	ctx = (TEEC_Context *) sk_ctx->tee_ctx_handle;
+	sess = (TEEC_Session *) sk_ctx->tee_sess_handle;
+
+	shm_in.size = sk_ctx->chunkLen;
+	shm_in.flags = TEEC_MEM_INPUT;
+
+	print_info("SK_DigestFinal:\n");
+	print_info("sk_ctx->tee_ctx_handle = 0x%p\n", (SK_CONTEXT_HANDLE *)sk_ctx->tee_ctx_handle);
+	print_info("sk_ctx->tee_sess_handle = 0x%p\n", (SK_CONTEXT_HANDLE *) sk_ctx->tee_sess_handle);
+	print_info("sk_ctx->tee_chunk = 0x%p\n", sk_ctx->chunk);
+	print_info("sk_ctx->tee_chunk_len = 0x%lx\n", shm_in.size);
+
+	res = TEEC_AllocateSharedMemory(ctx, &shm_in);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail1;
+	}
+
+	memcpy(shm_in.buffer, sk_ctx->chunk, shm_in.size);
+
+	shm_out.size = *outDigestLen;
+	shm_out.flags = TEEC_MEM_OUTPUT;
+
+	res = TEEC_AllocateSharedMemory(ctx, &shm_out);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_AllocateSharedMemory failed with code 0x%x\n", res);
+		ret = map_teec_err_to_sk(res, 0);
+		goto fail2;
+	}
+
+	memset(&op, 0, sizeof(op));
+	op.paramTypes = TEEC_PARAM_TYPES(TEEC_VALUE_INPUT, TEEC_MEMREF_WHOLE,
+					 TEEC_MEMREF_WHOLE, TEEC_NONE);
+	op.params[0].value.a = sk_ctx->mech.mechanism;
+	op.params[1].memref.parent = &shm_in;
+	op.params[1].memref.offset = 0;
+	op.params[1].memref.size = shm_in.size;
+	op.params[2].memref.parent = &shm_out;
+	op.params[2].memref.offset = 0;
+	op.params[2].memref.size = shm_out.size;
+
+	print_info("Invoking TEE_DIGEST_FINAL_DATA\n");
+	res = TEEC_InvokeCommand(sess, TEE_DIGEST_FINAL_DATA, &op,
+				 &err_origin);
+	if (res != TEEC_SUCCESS) {
+		print_error("TEEC_InvokeCommand failed with code 0x%x.\n", res);
+		ret = map_teec_err_to_sk(res, err_origin);
+		goto fail3;
+	}
+	print_info("TEE_DIGEST_DATA successful\n");
+
+	*outDigestLen = op.params[2].memref.size;
+
+	if (outDigest)
+		memcpy(outDigest, shm_out.buffer, *outDigestLen);
+fail3:
+	TEEC_ReleaseSharedMemory(&shm_out);
+fail2:
+	TEEC_ReleaseSharedMemory(&shm_in);
+fail1:
+	if ((outDigest) || (res != TEEC_SUCCESS)) {
+		TEEC_CloseSession(sess);
+		TEEC_FinalizeContext(ctx);
+
+		if (sess)
+			free(sess);
+		if (ctx)
+			free(ctx);
+	}
+end:
+	return ret;
+}
+
 static SK_FUNCTION_LIST global_function_list;
 
 SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
@@ -911,6 +1155,9 @@ SK_RET_CODE SK_GetFunctionList(SK_FUNCTION_LIST_PTR_PTR  ppFuncList)
 	global_function_list.SK_Sign = SK_Sign;
 	global_function_list.SK_Decrypt = SK_Decrypt;
 	global_function_list.SK_Digest = SK_Digest;
+	global_function_list.SK_DigestInit = SK_DigestInit;
+	global_function_list.SK_DigestUpdate = SK_DigestUpdate;
+	global_function_list.SK_DigestFinal = SK_DigestFinal;
 	global_function_list.SK_GenerateKeyPair = SK_GenerateKeyPair;
 	global_function_list.SK_EraseObject = SK_EraseObject;
 	global_function_list.SK_CreateObject = SK_CreateObject;

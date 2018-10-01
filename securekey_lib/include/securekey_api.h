@@ -41,6 +41,12 @@ struct SK_FUNCTION_LIST {
 	SK_RET_CODE(*SK_EraseObject)(SK_OBJECT_HANDLE hObject);
 	SK_RET_CODE(* SK_CreateObject)(SK_ATTRIBUTE *attr,
 		uint16_t attrCount, SK_OBJECT_HANDLE *phObject);
+	SK_RET_CODE(*SK_DigestInit)(SK_MECHANISM_INFO *pMechanismType,
+			SK_CONTEXT_INFO *sk_ctx);
+	SK_RET_CODE(*SK_DigestUpdate)(SK_CONTEXT_INFO *sk_ctx, const uint8_t *inPart,
+					uint16_t inPartLen);
+	SK_RET_CODE(*SK_DigestFinal)(SK_CONTEXT_INFO *sk_ctx, uint8_t *outDigest,
+					uint16_t *outDigestLen);
 };
 
 typedef struct SK_FUNCTION_LIST SK_FUNCTION_LIST;
@@ -356,4 +362,10 @@ SK_RET_CODE	SK_Digest(SK_MECHANISM_INFO *pMechanismType,
 		const uint8_t *inData, uint16_t inDataLen, uint8_t *outDigest,
 		uint16_t *outDigestLen);
 
+SK_RET_CODE	SK_DigestInit(SK_MECHANISM_INFO *pMechanismType,
+			SK_CONTEXT_INFO *sk_ctx);
+SK_RET_CODE	SK_DigestUpdate(SK_CONTEXT_INFO *sk_ctx, const uint8_t *inPart,
+			uint16_t inPartLen);
+SK_RET_CODE	SK_DigestFinal(SK_CONTEXT_INFO *sk_ctx, uint8_t *outDigest,
+			uint16_t *outDigestLen);
 #endif /* _SECUREKEY_API_H_*/
