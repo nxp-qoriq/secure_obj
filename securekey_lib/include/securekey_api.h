@@ -37,7 +37,8 @@ struct SK_FUNCTION_LIST {
 			uint8_t *outDigest, uint16_t *outDigestLen);
 	SK_RET_CODE(*SK_GenerateKeyPair)(SK_MECHANISM_INFO *pMechanism,
 			       SK_ATTRIBUTE *attr, uint16_t attrCount,
-			       SK_OBJECT_HANDLE *phKey);
+			       SK_OBJECT_HANDLE *pPublic_key,
+			       SK_OBJECT_HANDLE *pPrivate_key);
 	SK_RET_CODE(*SK_EraseObject)(SK_OBJECT_HANDLE hObject);
 	SK_RET_CODE(* SK_CreateObject)(SK_ATTRIBUTE *attr,
 		uint16_t attrCount, SK_OBJECT_HANDLE *phObject);
@@ -170,9 +171,10 @@ parameters are not supported by the library.
 returned.
 * Refer to securekey_api_types.h for error code description.
 */
-SK_RET_CODE	SK_GenerateKeyPair(SK_MECHANISM_INFO *pMechanism,
-		SK_ATTRIBUTE *attr, uint16_t attrCount,
-		SK_OBJECT_HANDLE *phKey);
+SK_RET_CODE SK_GenerateKeyPair(SK_MECHANISM_INFO *pMechanism,
+			       SK_ATTRIBUTE *attr, uint16_t attrCount,
+			       SK_OBJECT_HANDLE *pPublic_key,
+			       SK_OBJECT_HANDLE *pPrivate_key);
 
 /**
 * Erases an object from the HSM.

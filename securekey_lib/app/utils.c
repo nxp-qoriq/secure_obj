@@ -64,6 +64,8 @@ SK_OBJECT_TYPE getObjectType(char *objTypeStr)
 		return U32_INVALID;
 	else if (strcmp(objTypeStr, "pair") == 0)
 		return SK_KEY_PAIR;
+	else if (strcmp(objTypeStr, "pub") == 0)
+		return SK_PUBLIC_KEY;
 
 	printf("Unsupported Object Type: %s\n", objTypeStr);
 	return U32_INVALID;

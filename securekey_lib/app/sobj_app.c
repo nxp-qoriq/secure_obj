@@ -890,7 +890,7 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 	SK_RET_CODE sk_ret;
 	SK_ATTRIBUTE attrs[MAX_SK_ATTRS];
 	uint16_t attrCount = 0;
-	SK_OBJECT_HANDLE hObject;
+	SK_OBJECT_HANDLE hPrivateKey = 0, hPublicKey = 0;
 	SK_MECHANISM_INFO mechanismType = {0};
 	FILE *fptr = NULL;
 	char *label = NULL, *file_name = NULL;
@@ -957,14 +957,17 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 			goto end;
 	}
 
-	sk_ret = SK_GenerateKeyPair(&mechanismType, attrs, attrCount, &hObject);
+	sk_ret = SK_GenerateKeyPair(&mechanismType, attrs,
+			attrCount, &hPrivateKey, &hPublicKey);
 	if (sk_ret != SKR_OK) {
 		printf("SK_GenerateKeyPair failed wit err code = 0x%x\n", sk_ret);
 		ret = APP_SKR_ERR;
 		goto end;
 	} else {
 		ret = APP_OK;
-		printf("Object generated successfully handle = %u\n", hObject);
+		printf("Objects generated successfully handle\n");
+		printf("Private Key = %u, Public Key = %u\n", hPrivateKey,
+			hPublicKey);
 	}
 
 	if (mechanismType.mechanism == SKM_EC_PKCS_KEY_PAIR_GEN)
@@ -985,10 +988,10 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 				attrs[1].value = NULL;
 				attrs[1].valueLen = 0;
 
-				sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+				sk_ret = SK_GetObjectAttribute(hPrivateKey, attrs, 2);
 				if (sk_ret != SKR_OK) {
 					if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
-						printf("\nObject Handle[%d] not found.\n", hObject);
+						printf("\nObject Handle[%d] not found.\n", hPrivateKey);
 					else
 						printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
 
@@ -1010,7 +1013,7 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 					}
 				}
 
-				sk_ret = SK_GetObjectAttribute(hObject, attrs, 2);
+				sk_ret = SK_GetObjectAttribute(hPrivateKey, attrs, 2);
 				if (sk_ret != SKR_OK) {
 					printf("Failed to Get Attribute Values.\n");
 					ret = APP_SKR_ERR;
@@ -1043,10 +1046,10 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 				attrs[0].value = NULL;
 				attrs[0].valueLen = 0;
 
-				sk_ret = SK_GetObjectAttribute(hObject, attrs, 1);
+				sk_ret = SK_GetObjectAttribute(hPrivateKey, attrs, 1);
 				if (sk_ret != SKR_OK) {
 					if (sk_ret == SKR_ERR_ITEM_NOT_FOUND)
-						printf("\nObject Handle[%d] not found.\n", hObject);
+						printf("\nObject Handle[%d] not found.\n", hPrivateKey);
 					else
 						printf("\nSK_GetObjectAttribute failed with code = 0x%x\n", sk_ret);
 
@@ -1068,7 +1071,7 @@ static int do_GenerateKeyPair(struct getOptValue *getOptVal)
 					}
 				}
 
-				sk_ret = SK_GetObjectAttribute(hObject, attrs, 1);
+				sk_ret = SK_GetObjectAttribute(hPrivateKey, attrs, 1);
 				if (sk_ret != SKR_OK) {
 					printf("Failed to Get Attribute Values.\n");
 					ret = APP_SKR_ERR;

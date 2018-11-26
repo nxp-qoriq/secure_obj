@@ -311,7 +311,8 @@ end:
 
 SK_RET_CODE SK_GenerateKeyPair(SK_MECHANISM_INFO *pMechanism,
 			       SK_ATTRIBUTE *attr, uint16_t attrCount,
-			       SK_OBJECT_HANDLE *phKey)
+			       SK_OBJECT_HANDLE *pprivateKey,
+			       SK_OBJECT_HANDLE *ppublicKey)
 {
 	TEEC_Result res;
 	TEEC_Context ctx;
@@ -323,7 +324,7 @@ SK_RET_CODE SK_GenerateKeyPair(SK_MECHANISM_INFO *pMechanism,
 	SK_RET_CODE ret = SKR_OK;
 
 	if ((pMechanism == NULL) || (attr == NULL) || (attrCount <= 0) ||
-	    (phKey == NULL)) {
+	    (pprivateKey == NULL) || (ppublicKey == NULL)) {
 		ret = SKR_ERR_BAD_PARAMETERS;
 		goto end;
 	}
@@ -377,7 +378,9 @@ SK_RET_CODE SK_GenerateKeyPair(SK_MECHANISM_INFO *pMechanism,
 		ret = map_teec_err_to_sk(res, err_origin);
 		goto fail3;
 	}
-	*phKey = op.params[2].value.a;
+
+	*pprivateKey = op.params[2].value.a;
+	*ppublicKey = op.params[2].value.b;
 
 	print_info("TEE_GENERATE_KEYPAIR successful\n");
 
