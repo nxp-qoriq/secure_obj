@@ -16,9 +16,9 @@ EXPORT_DIR ?= $(O)/export
 OUT_DIR ?= $(O)/securekey_lib
 
 .PHONY: all securekey_lib install \
-	clean distclean sobj_app mp_app mp_verify
+	clean distclean sobj_app mp_app mp_verify gen_device_record
 
-all: securekey_lib securekey_static_lib install sobj_app mp_app mp_verify
+all: securekey_lib securekey_static_lib install sobj_app mp_app mp_verify gen_device_record
 
 LIB_NAME	:= libsecure_obj.so
 STATIC_LIB_NAME        := libsecure_obj.a
@@ -75,6 +75,11 @@ mp_verify:
 	@echo "Building Secure MP Feature Verification APP"
 	$(VPREFIX)$(CC) -g -Iinclude/ -I$(OPENSSL_PATH)/include -o app/mp_verify app/mp_verify.c -L$(OPENSSL_PATH) -lssl -lcrypto $(SECUREKEY_LFLAGS)
 	mv app/mp_verify ${EXPORT_DIR}/app
+
+gen_device_record:
+	@echo "Building Device record APP"
+	$(VPREFIX)$(CC) -Iinclude/ -o app/gen_device_record app/gen_device_record.c -lsecure_obj -Lout/securekey_lib/ $(SECUREKEY_LFLAGS)
+	mv app/gen_device_record ${EXPORT_DIR}/app
 
 install:
 	mkdir -p ${EXPORT_DIR}/lib ${EXPORT_DIR}/include ${EXPORT_DIR}/app
