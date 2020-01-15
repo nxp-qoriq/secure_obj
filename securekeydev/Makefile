@@ -11,9 +11,9 @@ securekeydev-objs = securekey_caam.o ioctl.o
 
 obj-m += securekeydev.o
 ifneq ($(KERNEL_BUILD),)
-	KERNEL_MAKE_OPTS := -C ${KERNEL_BUILD} SUBDIRS=$(shell pwd)
+	KERNEL_MAKE_OPTS := -C ${KERNEL_BUILD} M=$(shell pwd)
 else
-	KERNEL_MAKE_OPTS := -C $(KERNEL_SRC) SUBDIRS=$(shell pwd)
+	KERNEL_MAKE_OPTS := -C $(KERNEL_SRC) M=$(shell pwd)
 endif
 
 
