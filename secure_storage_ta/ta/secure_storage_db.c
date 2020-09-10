@@ -42,7 +42,13 @@ TEE_Result TA_OpenDatabase(void)
 					TEE_DATA_FLAG_ACCESS_WRITE,
 					NULL,
 					&obj_id_init, sizeof(obj_id_init),
-					NULL);
+					&hObject);
+	if (ret != TEE_SUCCESS) {
+                DMSG("Failed to create db object!!\n");
+                return ret;
+        }
+
+	TEE_CloseObject(hObject);
 	return ret;
 }
 

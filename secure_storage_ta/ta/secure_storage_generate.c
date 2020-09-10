@@ -341,7 +341,9 @@ TEE_Result TA_GenerateKeyPair(uint32_t param_types, TEE_Param params[4])
 {
 	TEE_Result res;
 	TEE_ObjectHandle privateKey = TEE_HANDLE_NULL;
+	TEE_ObjectHandle privateKeyPersistent = TEE_HANDLE_NULL;
 	TEE_ObjectHandle publicKey = TEE_HANDLE_NULL;
+	TEE_ObjectHandle publicKeyPersistent = TEE_HANDLE_NULL;
 	SK_ATTRIBUTE privattrs[MAX_KEY_PAIR_ATTRS] = {0};
 	SK_ATTRIBUTE pubattrs[MAX_KEY_PAIR_ATTRS] = {0};
 
@@ -471,9 +473,11 @@ TEE_Result TA_GenerateKeyPair(uint32_t param_types, TEE_Param params[4])
 					TEE_DATA_FLAG_ACCESS_READ,
 					privateKey, priv_attr_data,
 					priv_attr_data_len,
-					TEE_HANDLE_NULL);
+					&privateKeyPersistent);
 	if (res != TEE_SUCCESS)
 		goto out;
+
+	TEE_CloseObject(privateKeyPersistent);
 
 	DMSG("Get Next Object ID for Public Key!\n");
 	res = TA_GetNextObjectID(&public_key_obj_id);
@@ -487,10 +491,11 @@ TEE_Result TA_GenerateKeyPair(uint32_t param_types, TEE_Param params[4])
 					TEE_DATA_FLAG_ACCESS_READ,
 					publicKey, pub_attr_data,
 					pub_attr_data_len,
-					TEE_HANDLE_NULL);
+					&publicKeyPersistent);
 	if (res != TEE_SUCCESS)
 		goto out;
 
+	TEE_CloseObject(publicKeyPersistent);
 	params[2].value.a = private_key_obj_id;
 	params[2].value.b = public_key_obj_id;
 

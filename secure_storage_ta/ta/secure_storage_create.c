@@ -163,6 +163,7 @@ TEE_Result TA_CreateObject(uint32_t param_types, TEE_Param params[4])
 	SK_ATTRIBUTE *attrs = NULL;
 	TEE_Attribute *tee_attrs = NULL;
 	TEE_ObjectHandle tObject = TEE_HANDLE_NULL;
+	TEE_ObjectHandle pObject = TEE_HANDLE_NULL;
 	uint32_t attr_count = 0, tee_attr_count = 0, next_obj_id = 0;
 	uint32_t obj_type, obj_size;
 	uint8_t *data = NULL;
@@ -222,9 +223,11 @@ TEE_Result TA_CreateObject(uint32_t param_types, TEE_Param params[4])
 					TEE_DATA_FLAG_ACCESS_WRITE |
 					TEE_DATA_FLAG_ACCESS_READ,
 					tObject, data, data_len,
-					TEE_HANDLE_NULL);
+					&pObject);
 	if (res != TEE_SUCCESS)
 		goto out;
+
+	TEE_CloseObject(pObject);
 
 	params[1].value.a = next_obj_id;
 
