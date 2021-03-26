@@ -296,7 +296,7 @@ TEE_Result TA_SignDigest(uint32_t param_types, TEE_Param params[4])
 	if (res != TEE_SUCCESS)
 		goto out;
 
-	if (params[2].memref.buffer == NULL) {
+	if (params[2].memref.buffer == NULL || params[2].memref.size == 0) {
 		switch (objectInfo.objectType) {
 			case TEE_TYPE_RSA_KEYPAIR:
 				params[2].memref.size = objectInfo.maxObjectSize;
