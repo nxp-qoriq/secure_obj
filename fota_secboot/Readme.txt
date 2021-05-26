@@ -6,7 +6,7 @@ Steps to build the fsl_validate library.
 	fota_secboot/openssl/include"
 
 	Command:
-		export OPENSSL_PATH=/home/munish/Munish_work/secure_boot/fota_secboot/openssl/include
+		export OPENSSL_PATH=/home/munish/Munish_work/secure_boot/fota_secboot/openssl
 
 2. Export the CROSS_COMIPLE. by default Make utility takes "aarch64-linux-gnu-" as cross-compile tool.
 	Command:

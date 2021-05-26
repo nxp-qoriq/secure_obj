@@ -5,7 +5,6 @@
 #include "validate.h"
 #include "common.h"
 
-static struct ccsr_sfp_regs *g_sfp_addr;
 static const u8 barker_code[ESBC_BARKER_LEN] = { 0x68, 0x39, 0x27, 0x81 };
 
 /***************************************************************************
@@ -14,12 +13,12 @@ static const u8 barker_code[ESBC_BARKER_LEN] = { 0x68, 0x39, 0x27, 0x81 };
  * Return       :	WIll return the revoked key register value
  * Description  :	Read and return the Key_revoc register of SFP
  ***************************************************************************/
+#ifdef CONFIG_SRK
+static struct ccsr_sfp_regs *g_sfp_addr;
 static u32 get_key_revoc(void)
 {
-#ifdef CONFIG_SRK
 	return (sfp_in32(&g_sfp_addr->ospr) & OSPR_KEY_REVOC_MASK) >>
 		OSPR_KEY_REVOC_SHIFT;
-#endif
 }
 
 /***************************************************************************
@@ -39,6 +38,7 @@ static u32 is_key_revoked(u32 keynum, u32 rev_flag)
 
 	return 0;
 }
+#endif
 
 /***************************************************************************
  * Function     :	read_validate_srk_tbl
@@ -50,7 +50,7 @@ static u32 is_key_revoked(u32 keynum, u32 rev_flag)
 static u32 read_validate_srk_tbl(struct fsl_secboot_img *img)
 {
 	int i = 0;
-	u32 ret, key_num, key_revoc_flag, size;
+	u32 key_num, size;
 	struct fsl_secboot_img_hdr *hdr = &img->hdr;
 #ifdef DEBUG
 	printf("key_num: %d key_Sel: %d\n", hdr->len_kr.num_srk,
@@ -65,6 +65,7 @@ static u32 read_validate_srk_tbl(struct fsl_secboot_img *img)
 		return ERROR_ESBC_CLIENT_HEADER_INVALID_KEY_NUM;
 
 #ifdef CONFIG_SRK
+	u32 key_revoc_flag = 0, ret = 0;
 	/* Get revoc key from sfp */
 	key_revoc_flag = get_key_revoc();
 	ret = is_key_revoked(key_num, key_revoc_flag);
@@ -238,12 +239,14 @@ int fota_secboot_validate(const char *hdr_path, const char *bin_path)
 		ret = ERROR_INVALID_BIN_HDR_PATH;
 		goto exit;
 	}
-	int fd = 0, size = 0;
-	u8 *bin = NULL, *mmap_addr = NULL;
+	int size = 0;
+	u8 *bin = NULL;
 	FILE *hdr_file = NULL, *bin_file = NULL;
 	struct fsl_secboot_img *img = NULL;
-	u32 srk_hash[NUM_SRKH_REGS];
 #ifdef CONFIG_SRK
+	u32 srk_hash[NUM_SRKH_REGS];
+	u8 *mmap_addr = NULL;
+	int fd = 0;
 	/*
 	 * Open the ddr dev node to map the sfp register
 	 * of the system
@@ -370,7 +373,7 @@ int fota_secboot_validate(const char *hdr_path, const char *bin_path)
 	 */
 	char ch;
 
-	while (ch = fgetc(bin_file) != EOF)
+	while ((ch = fgetc(bin_file)) != EOF)
 		size++;
 
 #ifdef DEBUG
