@@ -1,5 +1,8 @@
 export CROSS_COMPILE_HOST=$CROSS_COMPILE
 export CROSS_COMPILE_TA=$CROSS_COMPILE
+if [ -z "$INSTALL_MOD_PATH" ];then
+echo Please specify INSTALL_MOD_PATH; exit 1
+fi
 
 if [ "$1" != "clean" ]; then
 if [ -d images ]; then
@@ -17,6 +20,7 @@ echo "Building Secure Key Kernel Module";
 cd securekeydev;
 make clean;
 make;
+make modules_install;
 cd -;
 
 echo "Building Secure Object Library";
