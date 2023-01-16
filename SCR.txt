@@ -1,0 +1,41 @@
+NXP Software Content Register
+----------------------------------------------------------------------------------------------------------------------------
+Secure_obj repository contains the Kernel module and User Space Libraries
+for implementing the Secure Storage solution backed by OP-TEE.
+
+Release Name:		Secure Object
+Package:		secure_obj
+Release Location:	https://bitbucket.sw.nxp.com/projects/DNDEV/repos/secure_obj/
+Origin: 		NXP (BSD-3-Clause OR GPL-2.0)
+
+
+Package - securekeydev
+-    Description: Kernel Module for Secure Storage service.
+-    Author: NXP
+-    License: GPL-2.0
+-    Format: source code
+-    Location: securekeydev
+
+Package - securekey_lib
+-    Description: User Space Library exposing APIs to applications
+-    Author: NXP
+-    License: BSD-3-Clause
+-    Format: source
+-    Location: securekey_lib
+
+Package - secure_obj-openssl-engine
+-    Description: User Space Library for integrating Secure Storage
+		  service with OpenSSL.
+-    Author: NXP
+-    License: BSD-3-Clause
+-    Format: source
+-    Location: secure_obj-openssl-engine
+
+Package - secure_storage_ta
+-    Description: Trusted Application providing backend for Secure Storage
+		  service.
+-    Author: NXP
+-    License: BSD-3-Clause
+-    Format: source
+-    Location: secure_storage_ta
+
