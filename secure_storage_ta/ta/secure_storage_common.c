@@ -64,7 +64,7 @@ TEE_Result TA_GetObjectAttributes(uint32_t param_types, TEE_Param params[4])
 	SK_ATTRIBUTE *attrs = NULL, *obj_attrs = NULL, *match_attr = NULL;
 	uint32_t attr_cnt = 0, obj_attr_cnt = 0, obj_id = 0, n;
 	uint8_t *data = NULL, *data_out = NULL;
-	uint32_t data_len = 0;
+	size_t data_len = 0;
 	size_t data_out_len = 0;
 	uint32_t exp_param_types = TEE_PARAM_TYPES(TEE_PARAM_TYPE_VALUE_INPUT,
 						   TEE_PARAM_TYPE_MEMREF_INOUT,

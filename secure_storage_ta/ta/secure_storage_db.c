@@ -56,7 +56,8 @@ TEE_Result TA_GetNextObjectID(uint32_t *next_obj_id)
 {
 	TEE_ObjectHandle hObject = TEE_HANDLE_NULL;
 	uint32_t ret = TEE_SUCCESS;
-	uint32_t obj_id = 0, read_bytes = 0;
+	uint32_t obj_id = 0;
+	size_t read_bytes = 0;
 
 	/* Try to open object database object */
 	ret = TEE_OpenPersistentObject(TEE_STORAGE_PRIVATE, (void *)db_obj_id,

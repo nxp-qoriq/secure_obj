@@ -30,7 +30,7 @@ static TEE_Result TA_GenerateECKeyPair(TEE_ObjectHandle *privateKey,
 	SK_ATTRIBUTE *get_attr;
 	TEE_Attribute curve_attr = {0};
 	uint32_t obj_size, key_attr_cnt = 0;
-	uint32_t obj_ret_size;
+	size_t obj_ret_size = 0;
 	uint32_t ec_size;
 
 	ec_pub_point[0] = 0x4;
@@ -192,8 +192,8 @@ static TEE_Result TA_GenerateRSAKeyPair(TEE_ObjectHandle *privateKey,
 	SK_ATTRIBUTE *get_attr;
 	TEE_Attribute exp_attr = {0};
 	uint32_t obj_size = 0, key_attr_cnt = 0;
-	uint32_t mod_size = MAX_KEY_SIZE_BYTES;
-	uint32_t pub_exp_size = MAX_KEY_SIZE_BYTES;
+	size_t mod_size = MAX_KEY_SIZE_BYTES;
+	size_t pub_exp_size = MAX_KEY_SIZE_BYTES;
 
 	DMSG("Unpack Object attributes!\n");
 	res = unpack_sk_attrs(in_buffer, size, &in_attrs, &in_attr_cnt);

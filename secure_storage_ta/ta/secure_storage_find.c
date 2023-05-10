@@ -15,7 +15,7 @@ static TEE_Result TA_FindAllObjects(SK_OBJECT_HANDLE *obj, uint32_t *obj_cnt,
 	TEE_Result res;
 	TEE_ObjectEnumHandle ehandle = TEE_HANDLE_NULL;
 	uint8_t obj_id[TEE_OBJECT_ID_MAX_LEN] = {0};
-	uint32_t obj_id_len = TEE_OBJECT_ID_MAX_LEN;
+	size_t obj_id_len = TEE_OBJECT_ID_MAX_LEN;
 	uint32_t cnt = 0;
 
 	res = TEE_AllocatePersistentObjectEnumerator(&ehandle);
@@ -67,7 +67,8 @@ static TEE_Result match_attr_obj(SK_ATTRIBUTE *attrs, uint32_t attr_count,
 	TEE_ObjectHandle hObject = TEE_HANDLE_NULL;
 	SK_ATTRIBUTE *obj_attrs = NULL, *match_attr = NULL;
 	uint8_t *data = NULL;
-	uint32_t data_len = 0, obj_attr_cnt = 0, n;
+	uint32_t obj_attr_cnt = 0, n = 0;
+	size_t data_len = 0;
 
 	*match = 0;
 
@@ -140,7 +141,7 @@ static TEE_Result TA_FindAttrMatchObjects(SK_ATTRIBUTE *attrs,
 	TEE_ObjectEnumHandle ehandle = TEE_HANDLE_NULL;
 	TEE_ObjectInfo objectInfo;
 	uint8_t obj_id[TEE_OBJECT_ID_MAX_LEN] = {0};
-	uint32_t obj_id_len = TEE_OBJECT_ID_MAX_LEN;
+	size_t obj_id_len = TEE_OBJECT_ID_MAX_LEN;
 	uint32_t cnt = 0, match = 0;
 
 	res = TEE_AllocatePersistentObjectEnumerator(&ehandle);
